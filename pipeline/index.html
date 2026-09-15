@@ -1,0 +1,507 @@
+<!DOCTYPE html>
+<html lang="id" data-judul="pipeline.judul_halaman">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Internal Talent Marketplace</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=Plus+Jakarta+Sans:wght@400..700&display=swap" rel="stylesheet">
+  <script src="/assets/js/prapasang.js"></script>
+  <link rel="stylesheet" href="/assets/css/app.css">
+</head>
+<body>
+
+<main class="mx-auto max-w-5xl px-5 py-6 space-y-5">
+  <div id="pesan" hidden role="alert"></div>
+
+  <section id="bagianPipeline" class="kartu p-6" hidden data-uji="pipeline">
+    <div class="flex flex-wrap items-start justify-between gap-3 mb-1">
+      <div class="min-w-0">
+        <h2 class="eyebrow text-tinta-redup mb-1" data-i18n="pipeline.pipeline_judul">Pipeline siklus</h2>
+        <p id="namaSiklusTerpilih" class="judul-halaman text-lg break-words"></p>
+      </div>
+      <button type="button" id="tombolTutupPipeline" class="tombol-halus" data-i18n="umum.tutup">Tutup</button>
+    </div>
+    <div id="pesanPipeline" hidden role="alert"></div>
+    <div id="kepalaPipeline" class="space-y-3 mb-5"></div>
+    <div id="isiPipeline" class="space-y-3"></div>
+  </section>
+
+  <section class="kartu p-6">
+    <h2 class="eyebrow text-tinta-redup mb-2" data-i18n="pipeline.daftar_judul">Siklus pencocokan</h2>
+    <p class="text-sm text-tinta-redup mb-4" data-i18n="pipeline.daftar_ket">Siklus bayangan dipakai untuk membandingkan aturan matching; hasilnya tidak mengubah apa yang dilihat karyawan.</p>
+    <div id="wadahSiklus"></div>
+    <div id="navSiklus"></div>
+  </section>
+
+  <section id="bagianBuat" class="kartu p-6" hidden>
+    <h2 class="eyebrow text-tinta-redup mb-2" data-i18n="pipeline.buat_judul">Buat siklus baru</h2>
+    <p class="text-sm text-tinta-redup mb-4" data-i18n="pipeline.buat_ket">Pilih peluang berstatus terbuka. Siklus memakai aturan matching yang sedang aktif dan baru menghasilkan kandidat setelah dijalankan.</p>
+    <div id="pesanBuat" hidden role="alert"></div>
+    <form id="formBuat" class="space-y-4" novalidate>
+      <div>
+        <label for="namaSiklus" class="block text-sm font-medium mb-1.5" data-i18n="pipeline.nama_siklus">Nama siklus</label>
+        <input id="namaSiklus" type="text" class="medan" maxlength="120" required>
+      </div>
+      <fieldset>
+        <legend class="block text-sm font-medium mb-1.5" data-i18n="pipeline.pilih_peluang">Peluang terbuka yang diikutkan</legend>
+        <div id="daftarPeluang" class="max-h-80 overflow-y-auto rounded-xl border border-garis-tipis divide-y divide-garis-tipis"></div>
+        <p id="catatanPeluang" class="text-mikro text-tinta-redup mt-1.5" hidden></p>
+      </fieldset>
+      <button type="submit" id="tombolBuat" class="tombol-utama" data-i18n="pipeline.buat_tombol">Buat siklus</button>
+    </form>
+  </section>
+</main>
+
+<script type="module">
+import { getJSON, postJSON } from "/assets/js/jscroot/api.js";
+import { getQueryString } from "/assets/js/jscroot/url.js";
+import { asal, PERAN } from "/assets/js/config.js";
+import { requireLogin, requireRole, tokenHeader, getUser } from "/assets/js/auth.js";
+import { pesan, sembunyikan, sehat, el, kosongkan, lencana, tabel, baris, kosong } from "/assets/js/ui.js";
+import { t, bahasa } from "/assets/js/i18n.js";
+import { pasang } from "/assets/js/nav.js";
+import { batangKontribusi, fmt } from "/assets/js/kontribusi.js";
+
+const ALUR = ["direkomendasikan", "berminat", "ditinjau", "diterima", "ditolak"];
+const LUAR_ALUR = ["tidak_direkomendasikan", "tidak_berminat"];
+const PER_HALAMAN = 20;
+const KANDIDAT_PER_TAMPIL = 50;
+
+if (requireLogin() && requireRole("H-01")) {
+    pasang("H-01");
+    const elPesan = document.getElementById("pesan");
+    const elPesanBuat = document.getElementById("pesanBuat");
+    const wadahSiklus = document.getElementById("wadahSiklus");
+    const navSiklus = document.getElementById("navSiklus");
+    const bagianPipeline = document.getElementById("bagianPipeline");
+    const kepalaPipeline = document.getElementById("kepalaPipeline");
+    const pesanPipeline = document.getElementById("pesanPipeline");
+    const isiPipeline = document.getElementById("isiPipeline");
+    const elNamaTerpilih = document.getElementById("namaSiklusTerpilih");
+    const bagianBuat = document.getElementById("bagianBuat");
+    const form = document.getElementById("formBuat");
+    const elNama = document.getElementById("namaSiklus");
+    const daftarPeluang = document.getElementById("daftarPeluang");
+    const catatanPeluang = document.getElementById("catatanPeluang");
+    const tombolBuat = document.getElementById("tombolBuat");
+
+    // Hanya HR yang menulis (API.md). PAKAR dan peran baca lain tidak melihat
+    // kontrol buat/jalankan sama sekali.
+    const bolehTulis = getUser().role === PERAN.HR;
+    const lokal = bahasa() === "en" ? "en-GB" : "id-ID";
+
+    let halamanSiklus = 1;
+    let daftarTerakhir = [];
+    let skillMap = null;
+    let peluangMap = null;
+
+    function tanggal(x, denganJam) {
+        if (!x) return "—";
+        const d = new Date(x);
+        if (isNaN(d)) return "—";
+        return denganJam ? d.toLocaleString(lokal) : d.toLocaleDateString(lokal);
+    }
+
+    function jenisMatch(status) {
+        if (status === "diterima" || status === "berminat") return "sah";
+        if (status === "ditinjau") return "tinjau";
+        return "netral";
+    }
+
+    function tombol(teks, kelas) {
+        const b = el("button", kelas || "tombol-halus", teks);
+        b.type = "button";
+        return b;
+    }
+
+    // denganTombol menonaktifkan tombol selama permintaan berjalan dan
+    // memulihkannya sebelum callback (yang tetap diawali sehat()) dijalankan.
+    function denganTombol(b, cb) {
+        const teksAsli = b.textContent;
+        b.disabled = true;
+        b.textContent = t("umum.memproses");
+        return function (hasil) {
+            b.disabled = false;
+            b.textContent = teksAsli;
+            cb(hasil);
+        };
+    }
+
+    function gambarNav(wadah, meta, muat) {
+        kosongkan(wadah);
+        const total = meta.total_pages || 1;
+        const n = meta.page || 1;
+        if (total <= 1) return;
+        const nav = el("div", "flex flex-wrap items-center justify-between gap-2 mt-4");
+        const sebelum = tombol(t("umum.sebelumnya"));
+        sebelum.disabled = n <= 1;
+        sebelum.addEventListener("click", function () { muat(n - 1); });
+        const sesudah = tombol(t("umum.berikutnya"));
+        sesudah.disabled = n >= total;
+        sesudah.addEventListener("click", function () { muat(n + 1); });
+        nav.appendChild(sebelum);
+        nav.appendChild(el("span", "text-sm text-tinta-redup font-data", t("umum.halaman", { n: n, total: total })));
+        nav.appendChild(sesudah);
+        wadah.appendChild(nav);
+    }
+
+    function lencanaBayangan() {
+        const l = lencana(t("pipeline.bayangan"), "netral");
+        l.dataset.uji = "siklus-bayangan";
+        return l;
+    }
+
+    // ── daftar siklus ──
+
+    function muatSiklus(halaman) {
+        getJSON(asal + "/api/siklus?page=" + encodeURIComponent(halaman) + "&limit=" + PER_HALAMAN, function (hasil) {
+            if (!sehat(hasil, elPesan)) return;
+            const daftar = hasil.data.data || [];
+            const meta = hasil.data.meta || {};
+            halamanSiklus = meta.page || halaman;
+            daftarTerakhir = daftar;
+            gambarDaftarSiklus(daftar);
+            gambarNav(navSiklus, meta, muatSiklus);
+        }, ...tokenHeader());
+    }
+
+    function gambarDaftarSiklus(daftar) {
+        kosongkan(wadahSiklus);
+        const { wadah, tbody } = tabel([
+            t("pipeline.kolom_nama"), t("pipeline.kolom_status"), t("pipeline.kolom_peluang"),
+            t("pipeline.kolom_match"), t("pipeline.kolom_tidak_ikut"), t("pipeline.kolom_dijalankan"), t("umum.aksi"),
+        ]);
+        if (!daftar.length) {
+            tbody.appendChild(kosong(7, t("pipeline.belum_ada_siklus")));
+        }
+        const terpilih = getQueryString().siklus;
+        daftar.forEach(function (s) {
+            const nama = el("div", "min-w-[12rem] space-y-1");
+            nama.appendChild(el("div", "font-medium break-words", s.nama));
+            if (s.bayangan) {
+                nama.appendChild(lencanaBayangan());
+                nama.appendChild(el("div", "text-mikro text-tinta-redup", t("pipeline.bayangan_ket")));
+            }
+            const aksi = el("div", "flex flex-wrap gap-2");
+            if (s.status === "dijalankan") {
+                const lihat = tombol(t("pipeline.lihat_pipeline"));
+                lihat.addEventListener("click", function () { pilihSiklus(s.id); });
+                aksi.appendChild(lihat);
+            } else if (bolehTulis) {
+                const jalan = tombol(t("pipeline.jalankan"), "tombol-utama");
+                jalan.addEventListener("click", function () { jalankan(s, jalan); });
+                aksi.appendChild(jalan);
+            }
+            const tr = baris([
+                nama,
+                lencana(t("status.siklus." + s.status), s.status === "dijalankan" ? "sah" : "netral"),
+                el("span", "font-data", (s.peluang_ids || []).length),
+                el("span", "font-data", s.status === "dijalankan" ? s.jumlah_match : "—"),
+                el("span", "font-data", s.status === "dijalankan" ? s.jumlah_tidak_ikut : "—"),
+                el("span", "whitespace-nowrap", tanggal(s.dijalankan_pada, true)),
+                aksi,
+            ]);
+            if (s.id === terpilih) tr.className += " bg-utama-muda";
+            tbody.appendChild(tr);
+        });
+        wadahSiklus.appendChild(wadah);
+    }
+
+    function jalankan(s, b) {
+        sembunyikan(elPesan);
+        if (!window.confirm(t("pipeline.konfirmasi_jalankan", { nama: s.nama }))) return;
+        postJSON(asal + "/api/siklus/" + encodeURIComponent(s.id) + "/jalankan", {}, denganTombol(b, function (hasil) {
+            if (!sehat(hasil, elPesan)) return;
+            pesan(elPesan, t("pipeline.siklus_dijalankan", { nama: s.nama }), "sah");
+            pilihSiklus(s.id);
+            muatSiklus(halamanSiklus);
+        }), ...tokenHeader());
+    }
+
+    // ── pipeline siklus terpilih ──
+
+    function pilihSiklus(id) {
+        const u = new URL(window.location.href);
+        if (id) u.searchParams.set("siklus", id); else u.searchParams.delete("siklus");
+        history.pushState(null, "", u.pathname + u.search);
+        tampilkanPipeline();
+        gambarDaftarSiklus(daftarTerakhir);
+        if (id) bagianPipeline.scrollIntoView({ block: "start" });
+    }
+
+    // Peta skill (untuk batang) dan peta peluang (untuk judul bagian yang
+    // masih terlipat) dimuat sekali, berurutan, hanya saat pipeline dibuka.
+    function siapkanAcuan(elP, lanjut) {
+        if (skillMap && peluangMap) { lanjut(); return; }
+        getJSON(asal + "/api/skill", function (hasil) {
+            if (!sehat(hasil, elP)) return;
+            skillMap = {};
+            (hasil.data.data.skill || []).forEach(function (s) { skillMap[s.kode] = s; });
+            getJSON(asal + "/api/peluang?limit=200", function (hasilPeluang) {
+                if (!sehat(hasilPeluang, elP)) return;
+                peluangMap = {};
+                (hasilPeluang.data.data || []).forEach(function (p) { peluangMap[p.id] = p; });
+                lanjut();
+            }, ...tokenHeader());
+        }, ...tokenHeader());
+    }
+
+    // penandaMemuat memakai elemen pesan sebagai teks "memproses": bila
+    // permintaan gagal, sehat() menimpanya dengan pesan galat.
+    function penandaMemuat(elP) {
+        elP.className = "text-sm text-tinta-redup";
+        elP.textContent = t("umum.memproses");
+        elP.hidden = false;
+    }
+
+    function tampilkanPipeline() {
+        const id = getQueryString().siklus;
+        kosongkan(kepalaPipeline);
+        kosongkan(isiPipeline);
+        elNamaTerpilih.textContent = "";
+        if (!id) {
+            bagianPipeline.hidden = true;
+            return;
+        }
+        bagianPipeline.hidden = false;
+        penandaMemuat(pesanPipeline);
+        siapkanAcuan(pesanPipeline, function () {
+            getJSON(asal + "/api/siklus/" + encodeURIComponent(id), function (hasil) {
+                if (!sehat(hasil, pesanPipeline)) return;
+                if (getQueryString().siklus !== id) return;
+                sembunyikan(pesanPipeline);
+                gambarPipeline(hasil.data.data);
+            }, ...tokenHeader());
+        });
+    }
+
+    function gambarPipeline(s) {
+        kosongkan(kepalaPipeline);
+        kosongkan(isiPipeline);
+        elNamaTerpilih.textContent = s.nama;
+
+        const lencanaBaris = el("div", "flex flex-wrap items-center gap-2");
+        lencanaBaris.appendChild(lencana(t("status.siklus." + s.status), s.status === "dijalankan" ? "sah" : "netral"));
+        if (s.bayangan) lencanaBaris.appendChild(lencanaBayangan());
+        kepalaPipeline.appendChild(lencanaBaris);
+        if (s.bayangan) {
+            kepalaPipeline.appendChild(el("p", "rounded-xl bg-latar px-3 py-2 text-sm text-tinta-redup", t("pipeline.bayangan_ket")));
+        }
+
+        const info = el("dl", "grid gap-x-6 gap-y-2 text-sm sm:grid-cols-3");
+        [
+            [t("pipeline.aturan"), s.aturan_id || "—", true],
+            [t("pipeline.kolom_dijalankan"), tanggal(s.dijalankan_pada, true), false],
+            [t("pipeline.kolom_match"), s.jumlah_match, true],
+            [t("pipeline.kolom_tidak_ikut"), s.jumlah_tidak_ikut, true],
+            [t("pipeline.kolom_peluang"), (s.peluang_ids || []).length, true],
+        ].forEach(function (p) {
+            const sel = el("div", "min-w-0");
+            sel.appendChild(el("dt", "text-mikro text-tinta-redup", p[0]));
+            sel.appendChild(el("dd", (p[2] ? "font-data " : "") + "break-words", p[1]));
+            info.appendChild(sel);
+        });
+        kepalaPipeline.appendChild(info);
+
+        const fairness = el("a", "tombol-halus inline-flex", t("pipeline.lihat_fairness"));
+        fairness.href = "/fairness/?siklus=" + encodeURIComponent(s.id);
+        fairness.dataset.uji = "tautan-fairness";
+        kepalaPipeline.appendChild(fairness);
+
+        if (s.status !== "dijalankan") {
+            isiPipeline.appendChild(el("p", "text-sm text-tinta-redup", t("pipeline.belum_dijalankan")));
+            return;
+        }
+        const ids = s.peluang_ids || [];
+        if (!ids.length) {
+            isiPipeline.appendChild(el("p", "text-sm text-tinta-redup", t("umum.tidak_ada_data")));
+            return;
+        }
+        isiPipeline.appendChild(el("p", "text-sm text-tinta-redup", t("pipeline.buka_peluang_ket")));
+        ids.forEach(function (pid) { isiPipeline.appendChild(bagianPeluang(s.id, pid)); });
+    }
+
+    function bagianPeluang(siklusId, pid) {
+        const p = peluangMap[pid];
+        const details = document.createElement("details");
+        details.className = "rounded-xl border border-garis-tipis";
+        const ringkas = document.createElement("summary");
+        ringkas.className = "cursor-pointer px-4 py-3";
+        const judul = el("span", "font-medium break-words", p ? p.judul : pid);
+        const sub = el("span", "block text-mikro text-tinta-redup", p ? t("jenis." + p.jenis) + " · " + p.unit : "");
+        ringkas.appendChild(judul);
+        ringkas.appendChild(sub);
+        details.appendChild(ringkas);
+        const isi = el("div", "px-4 pb-4 space-y-4");
+        details.appendChild(isi);
+
+        // Kandidat baru diambil saat bagian dibuka pertama kali, supaya siklus
+        // dengan banyak peluang tidak menembakkan puluhan permintaan sekaligus.
+        details.addEventListener("toggle", function () {
+            if (!details.open || details.dataset.dimuat) return;
+            details.dataset.dimuat = "1";
+            muatKandidat(siklusId, pid, isi, judul, sub);
+        });
+        return details;
+    }
+
+    function muatKandidat(siklusId, pid, isi, judul, sub) {
+        const elP = el("div");
+        elP.setAttribute("role", "alert");
+        isi.appendChild(elP);
+        penandaMemuat(elP);
+        getJSON(asal + "/api/peluang/" + encodeURIComponent(pid) + "/kandidat?siklus=" + encodeURIComponent(siklusId), function (hasil) {
+            if (!sehat(hasil, elP)) return;
+            const d = hasil.data.data || {};
+            sembunyikan(elP);
+            if (d.peluang) {
+                judul.textContent = d.peluang.judul;
+                sub.textContent = t("jenis." + d.peluang.jenis) + " · " + d.peluang.unit;
+            }
+            const kandidat = d.kandidat || [];
+            isi.appendChild(ringkasanTahap(kandidat));
+            gambarKandidat(isi, kandidat);
+        }, ...tokenHeader());
+    }
+
+    function chipTahap(status, jumlah) {
+        const c = el("div", "rounded-lg border border-garis-tipis px-2.5 py-1.5");
+        c.dataset.uji = "tahap";
+        c.dataset.status = status;
+        c.appendChild(el("div", "text-mikro text-tinta-redup", t("status.match." + status)));
+        c.appendChild(el("div", "font-data text-sm font-medium", jumlah));
+        return c;
+    }
+
+    function ringkasanTahap(kandidat) {
+        const hitung = {};
+        ALUR.concat(LUAR_ALUR).forEach(function (st) { hitung[st] = 0; });
+        kandidat.forEach(function (m) { hitung[m.status] = (hitung[m.status] || 0) + 1; });
+
+        const wadah = el("div", "space-y-2");
+        wadah.appendChild(el("p", "text-sm text-tinta-redup", t("pipeline.jumlah_kandidat", { n: kandidat.length })));
+        const alur = el("div", "flex flex-wrap items-center gap-2");
+        ALUR.forEach(function (st, i) {
+            if (i > 0) {
+                const pemisah = el("span", "text-tinta-samar", st === "ditolak" ? "/" : "→");
+                pemisah.setAttribute("aria-hidden", "true");
+                alur.appendChild(pemisah);
+            }
+            alur.appendChild(chipTahap(st, hitung[st]));
+        });
+        wadah.appendChild(alur);
+        const luar = el("div", "flex flex-wrap items-center gap-2");
+        luar.appendChild(el("span", "text-mikro text-tinta-redup", t("pipeline.di_luar_alur")));
+        LUAR_ALUR.forEach(function (st) { luar.appendChild(chipTahap(st, hitung[st])); });
+        wadah.appendChild(luar);
+        return wadah;
+    }
+
+    function gambarKandidat(isi, kandidat) {
+        const { wadah, tbody } = tabel([
+            t("pipeline.kolom_peringkat"), t("pipeline.kolom_kandidat"), t("rekomendasi.kolom_skor"),
+            t("rekomendasi.kolom_status"), "",
+        ]);
+        isi.appendChild(wadah);
+        if (!kandidat.length) {
+            tbody.appendChild(kosong(5, t("pipeline.tanpa_kandidat")));
+            return;
+        }
+        let tampil = 0;
+        const lanjut = tombol(t("umum.muat_lagi"));
+        function tambah() {
+            kandidat.slice(tampil, tampil + KANDIDAT_PER_TAMPIL).forEach(function (m) {
+                const k = m.karyawan || {};
+                const orang = el("div", "min-w-[10rem]");
+                orang.appendChild(el("div", "font-medium break-words", k.nama || m.karyawan_id));
+                orang.appendChild(el("div", "text-mikro text-tinta-redup", [k.jabatan, k.unit].filter(Boolean).join(" · ")));
+                const skor = el("div", "min-w-[10rem] space-y-1.5");
+                skor.appendChild(el("div", "font-data text-sm", fmt(m.skor)));
+                skor.appendChild(batangKontribusi(m, skillMap));
+                const a = el("a", "text-utama hover:underline text-sm whitespace-nowrap", t("pipeline.lihat_detail"));
+                a.href = "/detail-kandidat/?id=" + encodeURIComponent(m.id);
+                tbody.appendChild(baris([
+                    el("span", "font-data", m.peringkat),
+                    orang,
+                    skor,
+                    lencana(t("status.match." + m.status), jenisMatch(m.status)),
+                    a,
+                ]));
+            });
+            tampil = Math.min(kandidat.length, tampil + KANDIDAT_PER_TAMPIL);
+            lanjut.hidden = tampil >= kandidat.length;
+        }
+        lanjut.addEventListener("click", tambah);
+        isi.appendChild(lanjut);
+        tambah();
+    }
+
+    // ── buat siklus ──
+
+    function muatPeluangTerbuka() {
+        getJSON(asal + "/api/peluang?status=terbuka&limit=200", function (hasil) {
+            if (!sehat(hasil, elPesanBuat)) return;
+            const daftar = hasil.data.data || [];
+            const meta = hasil.data.meta || {};
+            kosongkan(daftarPeluang);
+            if (!daftar.length) {
+                daftarPeluang.appendChild(el("p", "px-3 py-3 text-sm text-tinta-redup", t("pipeline.tanpa_peluang_terbuka")));
+            }
+            daftar.forEach(function (p) {
+                const label = el("label", "flex items-start gap-3 px-3 py-2.5 cursor-pointer hover:bg-latar");
+                const cb = document.createElement("input");
+                cb.type = "checkbox";
+                cb.name = "peluang";
+                cb.value = p.id;
+                cb.className = "mt-1 h-4 w-4 shrink-0 accent-utama";
+                const teks = el("span", "min-w-0");
+                teks.appendChild(el("span", "block text-sm font-medium break-words", p.judul));
+                teks.appendChild(el("span", "block text-mikro text-tinta-redup", t("jenis." + p.jenis) + " · " + p.unit));
+                label.appendChild(cb);
+                label.appendChild(teks);
+                daftarPeluang.appendChild(label);
+            });
+            catatanPeluang.hidden = !(meta.total > daftar.length);
+            catatanPeluang.textContent = t("pipeline.peluang_terpotong", { n: daftar.length, total: meta.total || 0 });
+        }, ...tokenHeader());
+    }
+
+    form.addEventListener("submit", function (e) {
+        e.preventDefault();
+        sembunyikan(elPesanBuat);
+        const nama = elNama.value.trim();
+        const ids = Array.from(daftarPeluang.querySelectorAll("input[name=peluang]:checked")).map(function (c) { return c.value; });
+        if (!nama) {
+            pesan(elPesanBuat, t("pipeline.nama_wajib"), "tinjau");
+            return;
+        }
+        if (!ids.length) {
+            pesan(elPesanBuat, t("galat.siklus_tanpa_peluang"), "tinjau");
+            return;
+        }
+        postJSON(asal + "/api/siklus", { nama: nama, peluang_ids: ids }, denganTombol(tombolBuat, function (hasil) {
+            if (!sehat(hasil, elPesanBuat)) return;
+            form.reset();
+            pesan(elPesanBuat, t("pipeline.siklus_dibuat", { nama: nama }), "sah");
+            muatSiklus(1);
+        }), ...tokenHeader());
+    });
+
+    document.getElementById("tombolTutupPipeline").addEventListener("click", function () { pilihSiklus(""); });
+    window.addEventListener("popstate", function () {
+        tampilkanPipeline();
+        gambarDaftarSiklus(daftarTerakhir);
+    });
+
+    muatSiklus(1);
+    tampilkanPipeline();
+    if (bolehTulis) {
+        bagianBuat.hidden = false;
+        muatPeluangTerbuka();
+    }
+}
+</script>
+</body>
+</html>

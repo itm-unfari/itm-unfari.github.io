@@ -1,0 +1,156 @@
+<!DOCTYPE html>
+<html lang="id" data-judul="kandidat.judul_halaman">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Internal Talent Marketplace</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=Plus+Jakarta+Sans:wght@400..700&display=swap" rel="stylesheet">
+  <script src="/assets/js/prapasang.js"></script>
+  <link rel="stylesheet" href="/assets/css/app.css">
+</head>
+<body>
+
+<main class="mx-auto max-w-4xl px-5 py-6 space-y-5">
+  <div id="pesan" hidden role="alert"></div>
+  <a id="tautanKembali" href="/peluang-unit/" class="text-sm text-tinta-redup hover:underline" data-i18n="kandidat.kembali"></a>
+
+  <section id="kartuPeluang" class="kartu p-6" hidden>
+    <div class="flex flex-wrap items-start justify-between gap-3 mb-1">
+      <h2 id="judulPeluang" class="judul-halaman text-lg break-words min-w-0"></h2>
+      <span id="lencanaStatus"></span>
+    </div>
+    <p id="subPeluang" class="text-sm text-tinta-redup"></p>
+    <p id="siklusPeluang" class="text-mikro text-tinta-redup mt-2"></p>
+    <h3 class="eyebrow text-tinta-redup mt-5 mb-2" data-i18n="kandidat.skill_dibutuhkan"></h3>
+    <ul id="skillPeluang" class="flex flex-wrap gap-2"></ul>
+  </section>
+
+  <section id="kartuKandidat" class="kartu p-6" hidden>
+    <div class="flex flex-wrap items-baseline justify-between gap-3 mb-4">
+      <h2 class="eyebrow text-tinta-redup" data-i18n="kandidat.daftar"></h2>
+      <span id="jumlahKandidat" class="text-sm text-tinta-redup"></span>
+    </div>
+    <div id="wadahTabel"></div>
+    <p class="mt-4 text-mikro text-tinta-redup" data-i18n="kandidat.ket_batang"></p>
+  </section>
+</main>
+
+<script type="module">
+import { getJSON } from "/assets/js/jscroot/api.js";
+import { getQueryString } from "/assets/js/jscroot/url.js";
+import { asal, PERAN } from "/assets/js/config.js";
+import { requireLogin, requireRole, tokenHeader, getUser } from "/assets/js/auth.js";
+import { pesan, sehat, el, kosongkan, lencana, tabel, baris, kosong } from "/assets/js/ui.js";
+import { t, bahasa } from "/assets/js/i18n.js";
+import { pasang } from "/assets/js/nav.js";
+import { batangKontribusi, fmt, namaSkill } from "/assets/js/kontribusi.js";
+import { lencanaPeluang } from "/assets/js/peluang.js";
+
+if (requireLogin() && requireRole("M-02")) {
+    pasang("M-02");
+    const elPesan = document.getElementById("pesan");
+    const idPeluang = getQueryString().peluang;
+    const peran = (getUser() || {}).role;
+
+    document.getElementById("tautanKembali").href = peran === PERAN.MANAJER ? "/peluang-unit/" : "/peluang/";
+
+    function jenisMatch(status) {
+        if (status === "diterima" || status === "berminat") return "sah";
+        if (status === "ditinjau") return "tinjau";
+        return "netral";
+    }
+
+    function tanggal(x) {
+        const d = new Date(x);
+        return isNaN(d) ? "" : d.toLocaleDateString(bahasa() === "en" ? "en-GB" : "id-ID");
+    }
+
+    function gambarPeluang(p, siklus, skillMap) {
+        document.getElementById("judulPeluang").textContent = p.judul || "";
+        const elStatus = document.getElementById("lencanaStatus");
+        kosongkan(elStatus);
+        elStatus.appendChild(lencanaPeluang(p.status));
+        document.getElementById("subPeluang").textContent = t("jenis." + p.jenis) + " · " + (p.unit || "");
+        document.getElementById("siklusPeluang").textContent = siklus
+            ? t("kandidat.dari_siklus", { siklus: siklus.nama || siklus.id, tanggal: tanggal(siklus.dijalankan_pada) })
+            : "";
+        const ul = document.getElementById("skillPeluang");
+        kosongkan(ul);
+        const daftar = p.skill_dibutuhkan || [];
+        if (!daftar.length) ul.appendChild(el("li", "text-sm text-tinta-redup", t("kontribusi.kosong")));
+        daftar.forEach(function (k) {
+            const li = el("li", "rounded-full bg-latar px-3 py-1 text-sm");
+            li.appendChild(document.createTextNode(namaSkill(k.kode, skillMap) + " · " + t("tingkat." + k.tingkat)));
+            li.appendChild(el("span", "font-data text-tinta-redup ml-2", "×" + fmt(k.bobot)));
+            ul.appendChild(li);
+        });
+        document.getElementById("kartuPeluang").hidden = false;
+    }
+
+    function gambarKandidat(daftar, skillMap) {
+        const wadahTabel = document.getElementById("wadahTabel");
+        kosongkan(wadahTabel);
+        const kolom = [t("kandidat.kolom_peringkat"), t("kandidat.kolom_kandidat"), t("rekomendasi.kolom_skor"), t("rekomendasi.kolom_status"), ""];
+        const { wadah, tbody } = tabel(kolom);
+        if (!daftar.length) tbody.appendChild(kosong(kolom.length, t("kandidat.kosong")));
+        daftar.forEach(function (m) {
+            const k = m.karyawan || {};
+            const orang = el("div", "min-w-[9rem]");
+            orang.appendChild(el("div", "font-medium break-words", k.nama || ""));
+            orang.appendChild(el("div", "text-mikro text-tinta-redup break-words", k.jabatan || ""));
+            const skor = el("div", "min-w-[10rem] space-y-1.5");
+            skor.appendChild(el("div", "font-data text-sm", fmt(m.skor)));
+            skor.appendChild(batangKontribusi(m, skillMap));
+            const a = el("a", "text-utama hover:underline text-sm whitespace-nowrap", t("rekomendasi.lihat_penjelasan"));
+            a.href = "/penjelasan/?id=" + encodeURIComponent(m.id);
+            tbody.appendChild(baris([
+                el("span", "font-data", String(m.peringkat)),
+                orang,
+                skor,
+                lencana(t("status.match." + m.status), jenisMatch(m.status)),
+                a,
+            ]));
+        });
+        wadahTabel.appendChild(wadah);
+        document.getElementById("jumlahKandidat").textContent = t("kandidat.jumlah", { n: daftar.length });
+        document.getElementById("kartuKandidat").hidden = false;
+    }
+
+    // Tiga permintaan berjalan sendiri-sendiri: kepala peluang tetap tampil
+    // walau siklus belum dijalankan (404), dan kandidat tetap tampil (dengan
+    // kode skill) walau taksonomi gagal dimuat.
+    const data = { skillMap: {}, peluang: null, siklus: null, kandidat: null };
+
+    function gambar() {
+        if (data.peluang) gambarPeluang(data.peluang, data.siklus, data.skillMap);
+        if (data.kandidat) gambarKandidat(data.kandidat, data.skillMap);
+    }
+
+    if (!idPeluang) {
+        pesan(elPesan, t("kandidat.tanpa_peluang"), "tinjau");
+    } else {
+        getJSON(asal + "/api/skill", function (hasil) {
+            if (!sehat(hasil, elPesan)) return;
+            (hasil.data.data.skill || []).forEach(function (s) { data.skillMap[s.kode] = s; });
+            gambar();
+        }, ...tokenHeader());
+        getJSON(asal + "/api/peluang/" + encodeURIComponent(idPeluang), function (hasil) {
+            if (!sehat(hasil, elPesan)) return;
+            if (!data.peluang) data.peluang = hasil.data.data;
+            gambar();
+        }, ...tokenHeader());
+        getJSON(asal + "/api/peluang/" + encodeURIComponent(idPeluang) + "/kandidat", function (hasil) {
+            if (!sehat(hasil, elPesan)) return;
+            const d = hasil.data.data || {};
+            if (d.peluang) data.peluang = d.peluang;
+            data.siklus = d.siklus || null;
+            data.kandidat = d.kandidat || [];
+            gambar();
+        }, ...tokenHeader());
+    }
+}
+</script>
+</body>
+</html>

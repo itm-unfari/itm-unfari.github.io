@@ -1,0 +1,267 @@
+<!DOCTYPE html>
+<html lang="id" data-judul="detailKandidat.judul_halaman">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Internal Talent Marketplace</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=Plus+Jakarta+Sans:wght@400..700&display=swap" rel="stylesheet">
+  <script src="/assets/js/prapasang.js"></script>
+  <link rel="stylesheet" href="/assets/css/app.css">
+</head>
+<body>
+
+<main class="mx-auto max-w-4xl px-5 py-6 space-y-5">
+  <div id="pesan" hidden role="alert"></div>
+  <a id="tautanKembali" href="/pipeline/" class="text-sm text-tinta-redup hover:underline" data-i18n="detailKandidat.kembali_pipeline">← Kembali ke pipeline</a>
+
+  <div id="isi" class="space-y-5" hidden>
+    <section class="kartu p-6">
+      <div class="flex flex-wrap items-start justify-between gap-3 mb-1">
+        <h2 id="namaKaryawan" class="judul-halaman text-lg break-words"></h2>
+        <span id="lencanaStatus" class="flex flex-wrap gap-2"></span>
+      </div>
+      <p id="subKaryawan" class="text-sm text-tinta-redup mb-5"></p>
+      <dl id="konteks" class="grid gap-x-6 gap-y-3 text-sm sm:grid-cols-2"></dl>
+    </section>
+
+    <section class="kartu p-6">
+      <h2 class="eyebrow text-tinta-redup mb-2" data-i18n="detailKandidat.penjelasan_judul">Penjelasan skor</h2>
+      <p class="text-sm text-tinta-redup mb-4" data-i18n="detailKandidat.penjelasan_ket">Rincian ini dirakit dari kontribusi yang sama dengan penjelasan yang dilihat karyawan, sehingga angkanya identik.</p>
+      <div id="wadahKontribusi"></div>
+    </section>
+
+    <section id="bagianAksi" class="kartu p-6" hidden>
+      <h2 class="eyebrow text-tinta-redup mb-3" data-i18n="detailKandidat.aksi_judul">Ubah status</h2>
+      <div id="pesanAksi" hidden role="alert"></div>
+      <label for="catatan" class="block text-sm font-medium mb-1.5" data-i18n="detailKandidat.catatan">Catatan (opsional)</label>
+      <textarea id="catatan" class="medan" rows="3" maxlength="1000"></textarea>
+      <div id="wadahAksi" class="flex flex-wrap gap-2 mt-4"></div>
+    </section>
+
+    <section class="kartu p-6">
+      <h2 class="eyebrow text-tinta-redup mb-2" data-i18n="detailKandidat.snapshot_judul">Snapshot profil saat siklus dijalankan</h2>
+      <p class="text-sm text-tinta-redup mb-4" data-i18n="detailKandidat.snapshot_ket">Skor dihitung dari profil yang dibekukan ini, bukan dari profil karyawan saat ini.</p>
+      <div id="pesanSnapshot" hidden role="alert"></div>
+      <div id="wadahSnapshot"></div>
+    </section>
+
+    <section class="kartu p-6">
+      <h2 class="eyebrow text-tinta-redup mb-4" data-i18n="detailKandidat.riwayat_judul">Riwayat status</h2>
+      <div id="wadahRiwayat"></div>
+    </section>
+  </div>
+</main>
+
+<script type="module">
+import { getJSON, postJSON } from "/assets/js/jscroot/api.js";
+import { getQueryString } from "/assets/js/jscroot/url.js";
+import { asal, PERAN } from "/assets/js/config.js";
+import { requireLogin, requireRole, tokenHeader, getUser } from "/assets/js/auth.js";
+import { pesan, sembunyikan, sehat, el, kosongkan, lencana, tabel, baris, kosong } from "/assets/js/ui.js";
+import { t, bahasa } from "/assets/js/i18n.js";
+import { pasang } from "/assets/js/nav.js";
+import { renderKontribusi, namaSkill } from "/assets/js/kontribusi.js";
+
+// TRANSISI cermin model.TransisiStatus, hanya untuk memilih tombol yang
+// ditampilkan; backend tetap satu-satunya penegak (salah tampil → 400).
+const TRANSISI = {
+    direkomendasikan: { berminat: [PERAN.KARYAWAN], tidak_berminat: [PERAN.KARYAWAN], ditinjau: [PERAN.HR, PERAN.MANAJER] },
+    tidak_direkomendasikan: { berminat: [PERAN.KARYAWAN] },
+    berminat: { ditinjau: [PERAN.HR, PERAN.MANAJER], diterima: [PERAN.HR, PERAN.MANAJER], ditolak: [PERAN.HR, PERAN.MANAJER] },
+    ditinjau: { diterima: [PERAN.HR, PERAN.MANAJER], ditolak: [PERAN.HR, PERAN.MANAJER] },
+};
+
+if (requireLogin() && requireRole("H-02")) {
+    pasang("H-02");
+    const elPesan = document.getElementById("pesan");
+    const elPesanAksi = document.getElementById("pesanAksi");
+    const elPesanSnapshot = document.getElementById("pesanSnapshot");
+    const elIsi = document.getElementById("isi");
+    const elCatatan = document.getElementById("catatan");
+    const bagianAksi = document.getElementById("bagianAksi");
+    const wadahAksi = document.getElementById("wadahAksi");
+    const id = getQueryString().id;
+    const peran = getUser().role;
+    const lokal = bahasa() === "en" ? "en-GB" : "id-ID";
+    let taksonomi = null;
+
+    function waktu(x) {
+        const d = new Date(x);
+        return isNaN(d) ? "—" : d.toLocaleString(lokal);
+    }
+
+    function jenisMatch(status) {
+        if (status === "diterima" || status === "berminat") return "sah";
+        if (status === "ditinjau") return "tinjau";
+        return "netral";
+    }
+
+    function lencanaStatus(st) {
+        return st ? lencana(t("status.match." + st), jenisMatch(st)) : el("span", "text-tinta-samar", "—");
+    }
+
+    function sel(label, nilai, kelasNilai) {
+        const d = el("div", "min-w-0");
+        d.appendChild(el("dt", "text-mikro text-tinta-redup", label));
+        const dd = el("dd", "mt-0.5 break-words " + (kelasNilai || ""));
+        if (nilai instanceof Node) dd.appendChild(nilai); else dd.textContent = nilai == null || nilai === "" ? "—" : String(nilai);
+        d.appendChild(dd);
+        return d;
+    }
+
+    if (!id) {
+        pesan(elPesan, t("detailKandidat.tanpa_id"), "galat");
+    } else {
+        muat();
+    }
+
+    function muat() {
+        getJSON(asal + "/api/match/" + encodeURIComponent(id), function (hasil) {
+            if (!sehat(hasil, elPesan)) return;
+            gambar(hasil.data.data);
+        }, ...tokenHeader());
+    }
+
+    function gambar(d) {
+        const m = d.match;
+        const k = d.karyawan || {};
+        const p = d.peluang || {};
+        const a = d.aturan || {};
+        elIsi.hidden = false;
+
+        const kembali = document.getElementById("tautanKembali");
+        kembali.href = "/pipeline/?siklus=" + encodeURIComponent(m.siklus_id);
+
+        document.getElementById("namaKaryawan").textContent = k.nama || m.karyawan_id;
+        document.getElementById("subKaryawan").textContent = [k.jabatan, k.unit].filter(Boolean).join(" · ");
+        const elStatus = document.getElementById("lencanaStatus");
+        kosongkan(elStatus);
+        elStatus.appendChild(lencanaStatus(m.status));
+
+        const konteks = document.getElementById("konteks");
+        kosongkan(konteks);
+        const peluang = el("div");
+        peluang.appendChild(el("div", "font-medium", p.judul || m.peluang_id));
+        if (p.jenis) peluang.appendChild(el("div", "text-mikro text-tinta-redup", t("jenis." + p.jenis) + " · " + p.unit));
+        konteks.appendChild(sel(t("detailKandidat.peluang"), peluang));
+        konteks.appendChild(sel(t("detailKandidat.siklus"), m.siklus_id, "font-data"));
+        konteks.appendChild(sel(t("detailKandidat.peringkat"), m.peringkat, "font-data"));
+        const aturan = el("div", "flex flex-wrap items-center gap-2");
+        aturan.appendChild(el("span", "font-data", a.versi || m.aturan_id));
+        if (a.asal) aturan.appendChild(lencana(t("detailKandidat.asal_" + a.asal), "netral"));
+        konteks.appendChild(sel(t("detailKandidat.versi_aturan"), aturan));
+        konteks.appendChild(sel(t("detailKandidat.direkomendasikan"),
+            lencana(t(m.direkomendasikan ? "umum.ya" : "umum.tidak"), m.direkomendasikan ? "sah" : "netral")));
+        if (m.kondisi_batas_id) konteks.appendChild(sel(t("detailKandidat.kondisi_batas"), m.kondisi_batas_id, "font-data"));
+
+        // Perakit yang sama dengan K-04: angka HR dan karyawan tidak boleh berbeda.
+        renderKontribusi(document.getElementById("wadahKontribusi"), m, d.skill);
+
+        gambarAksi(m);
+        gambarSnapshot(m.snapshot_profil || [], d.skill);
+        gambarRiwayat(m.riwayat_status || []);
+        if (!taksonomi) muatTaksonomi(m.snapshot_profil || [], d.skill);
+    }
+
+    function gambarAksi(m) {
+        kosongkan(wadahAksi);
+        const tujuan = peran === PERAN.PAKAR ? {} : (TRANSISI[m.status] || {});
+        const boleh = Object.keys(tujuan).filter(function (ke) { return tujuan[ke].includes(peran); });
+        bagianAksi.hidden = !boleh.length;
+        boleh.forEach(function (ke) {
+            const b = el("button", ke === "diterima" ? "tombol-utama" : "tombol-halus", t("aksiMatch." + ke));
+            b.type = "button";
+            b.addEventListener("click", function () { ubahStatus(ke); });
+            wadahAksi.appendChild(b);
+        });
+    }
+
+    function ubahStatus(ke) {
+        sembunyikan(elPesanAksi);
+        const badan = { ke: ke };
+        const catatan = elCatatan.value.trim();
+        if (catatan) badan.catatan = catatan;
+        postJSON(asal + "/api/match/" + encodeURIComponent(id) + "/status", badan, kunciTombol(wadahAksi, function (hasil) {
+            if (!sehat(hasil, elPesanAksi)) return;
+            elCatatan.value = "";
+            pesan(elPesan, t("detailKandidat.status_diubah", { status: t("status.match." + ke) }), "sah");
+            muat();
+        }), ...tokenHeader());
+    }
+
+    // kunciTombol mencegah klik ganda selama permintaan berjalan; tombol
+    // dibuka lagi sebelum callback (yang diawali sehat()) dijalankan.
+    function kunciTombol(wadah, cb) {
+        const daftar = Array.from(wadah.querySelectorAll("button"));
+        daftar.forEach(function (b) { b.disabled = true; });
+        return function (hasil) {
+            daftar.forEach(function (b) { b.disabled = false; });
+            cb(hasil);
+        };
+    }
+
+    // Peta skill match hanya memuat skill yang relevan; nama skill snapshot di
+    // luar itu diambil dari taksonomi aktif sebagai cadangan.
+    function petaGabungan(skillMatch) {
+        const peta = {};
+        if (taksonomi) Object.keys(taksonomi).forEach(function (kode) { peta[kode] = taksonomi[kode]; });
+        Object.keys(skillMatch || {}).forEach(function (kode) { peta[kode] = skillMatch[kode]; });
+        return peta;
+    }
+
+    function muatTaksonomi(snapshot, skillMatch) {
+        const kurang = snapshot.some(function (s) { return !(skillMatch && skillMatch[s.kode]); });
+        if (!kurang) return;
+        getJSON(asal + "/api/skill", function (hasil) {
+            if (!sehat(hasil, elPesanSnapshot)) return;
+            taksonomi = {};
+            (hasil.data.data.skill || []).forEach(function (s) { taksonomi[s.kode] = s; });
+            gambarSnapshot(snapshot, skillMatch);
+        }, ...tokenHeader());
+    }
+
+    function gambarSnapshot(snapshot, skillMatch) {
+        const wadahSnapshot = document.getElementById("wadahSnapshot");
+        kosongkan(wadahSnapshot);
+        const peta = petaGabungan(skillMatch);
+        const { wadah, tbody } = tabel([t("detailKandidat.kolom_skill"), t("detailKandidat.kolom_tingkat")]);
+        if (!snapshot.length) tbody.appendChild(kosong(2, t("detailKandidat.snapshot_kosong")));
+        snapshot.slice().sort(function (x, y) { return y.tingkat - x.tingkat || (x.kode < y.kode ? -1 : 1); }).forEach(function (s) {
+            tbody.appendChild(baris([namaSkill(s.kode, peta), t("tingkat." + s.tingkat)]));
+        });
+        wadahSnapshot.appendChild(wadah);
+    }
+
+    function gambarRiwayat(riwayat) {
+        const wadahRiwayat = document.getElementById("wadahRiwayat");
+        kosongkan(wadahRiwayat);
+        const { wadah, tbody } = tabel([
+            t("detailKandidat.kolom_perubahan"), t("detailKandidat.kolom_peran"),
+            t("detailKandidat.kolom_waktu"), t("detailKandidat.kolom_catatan"),
+        ]);
+        if (!riwayat.length) tbody.appendChild(kosong(4, t("detailKandidat.riwayat_kosong")));
+        riwayat.forEach(function (r) {
+            const ubah = el("div", "flex flex-wrap items-center gap-1.5 min-w-[12rem]");
+            ubah.appendChild(lencanaStatus(r.dari));
+            const panah = el("span", "text-tinta-samar", "→");
+            panah.setAttribute("aria-hidden", "true");
+            ubah.appendChild(panah);
+            ubah.appendChild(lencanaStatus(r.ke));
+            const olehnya = el("div", "whitespace-nowrap");
+            olehnya.appendChild(el("div", "", r.peran ? t("peran." + r.peran) : "—"));
+            if (r.oleh) olehnya.appendChild(el("div", "text-mikro text-tinta-redup font-data", r.oleh));
+            tbody.appendChild(baris([
+                ubah,
+                olehnya,
+                el("span", "whitespace-nowrap", waktu(r.pada)),
+                el("span", "block min-w-[10rem] whitespace-pre-wrap break-words", r.catatan || "—"),
+            ]));
+        });
+        wadahRiwayat.appendChild(wadah);
+    }
+}
+</script>
+</body>
+</html>

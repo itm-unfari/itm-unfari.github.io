@@ -115,6 +115,10 @@ export async function pasangApiTiruan(page, penjawab) {
     };
     await page.route("**/auth/**", tangani);
     await page.route("**/health", tangani);
+    // /api/** yang tidak disebut penjawab dijawab 404 rute_tidak_ditemukan,
+    // BUKAN diteruskan ke jaringan: backend sungguhan akan menolak token
+    // tiruan dengan 401 sesi_tidak_sah dan halaman membuang sesi.
+    await page.route("**/api/**", tangani);
     return dicatat;
 }
 

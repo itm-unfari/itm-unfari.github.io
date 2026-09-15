@@ -1,0 +1,270 @@
+<!DOCTYPE html>
+<html lang="id" data-judul="grafikSkill.judul_halaman">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Internal Talent Marketplace</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=Plus+Jakarta+Sans:wght@400..700&display=swap" rel="stylesheet">
+  <script src="/assets/js/prapasang.js"></script>
+  <link rel="stylesheet" href="/assets/css/app.css">
+</head>
+<body>
+
+<main class="mx-auto max-w-5xl px-5 py-6 space-y-5">
+  <div id="pesan" hidden role="alert"></div>
+
+  <section class="kartu p-6">
+    <h2 class="eyebrow text-tinta-redup mb-2" data-i18n="grafikSkill.pengantar_judul">Tepi kedekatan antarskill</h2>
+    <p class="text-sm mb-2" data-i18n="grafikSkill.hanya_diterima" data-uji="hanya-diterima">Hanya tepi yang sudah diterima yang dipakai dalam matching.</p>
+    <p class="text-sm text-tinta-redup" data-i18n="grafikSkill.pengantar_ket">Tepi diusulkan dari kemiripan embedding nama dan deskripsi skill. Tepi lintas kelompok ditandai karena kemiripan antarkelompok yang berbeda layak ditelaah lebih cermat.</p>
+    <div id="bagianUsulkan" class="mt-4" hidden>
+      <button type="button" id="tombolUsulkan" class="tombol-halus" data-i18n="grafikSkill.usulkan">Usulkan tepi dari embedding</button>
+      <p id="statusUsulkan" class="mt-3 text-sm text-tinta-redup" role="status" hidden></p>
+    </div>
+  </section>
+
+  <section class="kartu p-6">
+    <div class="segmen mb-4" role="group" data-i18n-label="grafikSkill.saring_status" id="tabStatus">
+      <button type="button" data-status="usulan" data-i18n="status.tepi.usulan">Usulan</button>
+      <button type="button" data-status="diterima" data-i18n="status.tepi.diterima">Diterima</button>
+      <button type="button" data-status="ditolak" data-i18n="status.tepi.ditolak">Ditolak</button>
+    </div>
+    <div id="wadahTabel"></div>
+    <div id="navTabel"></div>
+  </section>
+</main>
+
+<script type="module">
+import { getJSON, postJSON } from "/assets/js/jscroot/api.js";
+import { getQueryString } from "/assets/js/jscroot/url.js";
+import { asal, PERAN } from "/assets/js/config.js";
+import { requireLogin, requireRole, tokenHeader, getUser } from "/assets/js/auth.js";
+import { pesan, sembunyikan, sehat, el, kosongkan, lencana, tabel, baris, kosong } from "/assets/js/ui.js";
+import { t, bahasa } from "/assets/js/i18n.js";
+import { pasang } from "/assets/js/nav.js";
+import { namaSkill } from "/assets/js/kontribusi.js";
+
+const STATUS = ["usulan", "diterima", "ditolak"];
+const PER_HALAMAN = 50;
+const BATAS_TUNGGU = 40;
+
+if (requireLogin() && requireRole("H-06")) {
+    pasang("H-06");
+    const elPesan = document.getElementById("pesan");
+    const wadahTabel = document.getElementById("wadahTabel");
+    const navTabel = document.getElementById("navTabel");
+    const tabStatus = document.getElementById("tabStatus");
+    const statusUsulkan = document.getElementById("statusUsulkan");
+    const tombolUsulkan = document.getElementById("tombolUsulkan");
+
+    // Hanya HR yang menulis (API.md). PAKAR dan peran baca lain tidak melihat
+    // tombol usulkan maupun terima/tolak.
+    const bolehTulis = getUser().role === PERAN.HR;
+    const lokal = bahasa() === "en" ? "en-GB" : "id-ID";
+
+    let skillMap = {};
+    let status = STATUS.includes(getQueryString().status) ? getQueryString().status : "usulan";
+    let halaman = 1;
+
+    function tombol(teks, kelas) {
+        const b = el("button", kelas || "tombol-halus", teks);
+        b.type = "button";
+        return b;
+    }
+
+    // denganTombol menonaktifkan tombol (dan tombol pasangannya) selama
+    // permintaan berjalan, lalu memulihkannya sebelum callback yang diawali
+    // sehat() dijalankan.
+    function denganTombol(b, cb, lain) {
+        const teksAsli = b.textContent;
+        b.disabled = true;
+        b.textContent = t("umum.memproses");
+        return function (hasil) {
+            b.disabled = false;
+            if (lain) lain.disabled = false;
+            b.textContent = teksAsli;
+            cb(hasil);
+        };
+    }
+
+    function gambarNav(wadah, meta, muat) {
+        kosongkan(wadah);
+        const total = meta.total_pages || 1;
+        const n = meta.page || 1;
+        if (total <= 1) return;
+        const nav = el("div", "flex flex-wrap items-center justify-between gap-2 mt-4");
+        const sebelum = tombol(t("umum.sebelumnya"));
+        sebelum.disabled = n <= 1;
+        sebelum.addEventListener("click", function () { muat(n - 1); });
+        const sesudah = tombol(t("umum.berikutnya"));
+        sesudah.disabled = n >= total;
+        sesudah.addEventListener("click", function () { muat(n + 1); });
+        nav.appendChild(sebelum);
+        nav.appendChild(el("span", "text-sm text-tinta-redup font-data", t("umum.halaman", { n: n, total: total })));
+        nav.appendChild(sesudah);
+        wadah.appendChild(nav);
+    }
+
+    function tandaiTab() {
+        tabStatus.querySelectorAll("button").forEach(function (b) {
+            b.setAttribute("aria-pressed", String(b.dataset.status === status));
+        });
+    }
+
+    function pilihStatus(st) {
+        status = st;
+        const u = new URL(window.location.href);
+        u.searchParams.set("status", st);
+        history.replaceState(null, "", u.pathname + u.search);
+        tandaiTab();
+        muat(1);
+    }
+
+    function kemiripan(nilai) {
+        const r = Math.max(0, Math.min(1, Number(nilai) || 0));
+        const wadah = el("div", "min-w-[7rem] space-y-1");
+        wadah.appendChild(el("div", "font-data text-sm", (r * 100).toFixed(1) + "%"));
+        const batang = el("div", "h-1.5 w-full max-w-[8rem] overflow-hidden rounded-full bg-garis-tipis");
+        batang.setAttribute("aria-hidden", "true");
+        const isi = el("div", "h-full bg-utama");
+        isi.style.width = (r * 100) + "%";
+        batang.appendChild(isi);
+        wadah.appendChild(batang);
+        return wadah;
+    }
+
+    function lencanaStatus(st) {
+        return lencana(t("status.tepi." + st), st === "diterima" ? "sah" : st === "usulan" ? "tinjau" : "netral");
+    }
+
+    function muat(n) {
+        const diminta = status;
+        getJSON(asal + "/api/grafik-skill?status=" + encodeURIComponent(diminta) + "&page=" + encodeURIComponent(n) + "&limit=" + PER_HALAMAN, function (hasil) {
+            if (!sehat(hasil, elPesan)) return;
+            if (diminta !== status) return;
+            const meta = hasil.data.meta || {};
+            halaman = meta.page || n;
+            gambarTabel(hasil.data.data || []);
+            gambarNav(navTabel, meta, muat);
+        }, ...tokenHeader());
+    }
+
+    function gambarTabel(daftar) {
+        kosongkan(wadahTabel);
+        const tampilAksi = bolehTulis && status === "usulan";
+        const kolom = [
+            t("grafikSkill.kolom_skill_a"), t("grafikSkill.kolom_skill_b"), t("grafikSkill.kolom_kemiripan"),
+            t("grafikSkill.kolom_status"), t("grafikSkill.kolom_asal"),
+        ];
+        if (tampilAksi) kolom.push(t("umum.aksi"));
+        const { wadah, tbody } = tabel(kolom);
+        if (!daftar.length) tbody.appendChild(kosong(kolom.length, t("grafikSkill.kosong_" + status)));
+        daftar.forEach(function (e) {
+            const keadaan = el("div", "flex flex-wrap items-center gap-1.5 min-w-[8rem]");
+            keadaan.appendChild(lencanaStatus(e.status));
+            if (e.status === "usulan") {
+                const ai = lencana(t("umum.tandaAI"), "tinjau");
+                ai.dataset.uji = "tanda-ai";
+                keadaan.appendChild(ai);
+            }
+            if (e.lintas_kelompok) {
+                const lintas = lencana(t("grafikSkill.lintas_kelompok"), "tinjau");
+                lintas.title = t("grafikSkill.lintas_kelompok_ket");
+                lintas.dataset.uji = "lintas-kelompok";
+                keadaan.appendChild(lintas);
+            }
+            if (e.status !== "usulan" && e.diputuskan_pada) {
+                const d = new Date(e.diputuskan_pada);
+                if (!isNaN(d)) keadaan.appendChild(el("span", "basis-full text-mikro text-tinta-redup", d.toLocaleDateString(lokal)));
+            }
+
+            const sumber = el("div", "min-w-[8rem] text-mikro text-tinta-redup");
+            sumber.appendChild(el("div", "font-data break-all", e.model_embedding || "—"));
+            sumber.appendChild(el("div", "", t("grafikSkill.versi_taksonomi", { versi: e.versi_taksonomi || "—" })));
+
+            const sel = [
+                el("span", "block min-w-[9rem] font-medium break-words", namaSkill(e.skill_a, skillMap)),
+                el("span", "block min-w-[9rem] font-medium break-words", namaSkill(e.skill_b, skillMap)),
+                kemiripan(e.kemiripan),
+                keadaan,
+                sumber,
+            ];
+            if (tampilAksi) {
+                const aksi = el("div", "flex flex-wrap gap-2");
+                if (e.status === "usulan") {
+                    const terima = tombol(t("grafikSkill.terima"));
+                    const tolak = tombol(t("grafikSkill.tolak"));
+                    terima.addEventListener("click", function () { putuskan(e, "diterima", terima, tolak); });
+                    tolak.addEventListener("click", function () { putuskan(e, "ditolak", tolak, terima); });
+                    aksi.appendChild(terima);
+                    aksi.appendChild(tolak);
+                }
+                sel.push(aksi);
+            }
+            tbody.appendChild(baris(sel));
+        });
+        wadahTabel.appendChild(wadah);
+    }
+
+    function putuskan(e, keputusan, b, lain) {
+        sembunyikan(elPesan);
+        lain.disabled = true;
+        postJSON(asal + "/api/tepi-skill/" + encodeURIComponent(e.id) + "/putuskan", { keputusan: keputusan }, denganTombol(b, function (hasil) {
+            if (!sehat(hasil, elPesan)) return;
+            muat(halaman);
+        }, lain), ...tokenHeader());
+    }
+
+    function tampilStatusUsulkan(teks) {
+        statusUsulkan.textContent = teks;
+        statusUsulkan.hidden = false;
+    }
+
+    function tungguTugas(tugasId, sisa) {
+        getJSON(asal + "/api/tugas-ai/" + encodeURIComponent(tugasId), function (hasil) {
+            if (!sehat(hasil, elPesan)) return;
+            const tugas = hasil.data.data;
+            if (tugas.status === "selesai") {
+                statusUsulkan.hidden = true;
+                pesan(elPesan, t("grafikSkill.usulkan_selesai"), "sah");
+                pilihStatus("usulan");
+            } else if (tugas.status === "gagal") {
+                tampilStatusUsulkan(t("grafikSkill.usulkan_gagal"));
+            } else if (sisa <= 0) {
+                tampilStatusUsulkan(t("usulanSkill.masih_diproses"));
+            } else {
+                tampilStatusUsulkan(t("grafikSkill.usulkan_diproses", { status: t("status.tugas." + tugas.status) }));
+                setTimeout(function () { tungguTugas(tugasId, sisa - 1); }, 1500);
+            }
+        }, ...tokenHeader());
+    }
+
+    tabStatus.querySelectorAll("button").forEach(function (b) {
+        b.addEventListener("click", function () { if (b.dataset.status !== status) pilihStatus(b.dataset.status); });
+    });
+    tandaiTab();
+
+    if (bolehTulis) {
+        document.getElementById("bagianUsulkan").hidden = false;
+        tombolUsulkan.addEventListener("click", function () {
+            sembunyikan(elPesan);
+            postJSON(asal + "/api/grafik-skill/usulkan", {}, denganTombol(tombolUsulkan, function (hasil) {
+                if (!sehat(hasil, elPesan)) return;
+                const tugas = hasil.data.data;
+                tampilStatusUsulkan(t("grafikSkill.usulkan_diproses", { status: t("status.tugas." + tugas.status) }));
+                tungguTugas(tugas.id, BATAS_TUNGGU);
+            }), ...tokenHeader());
+        });
+    }
+
+    getJSON(asal + "/api/skill", function (hasil) {
+        if (!sehat(hasil, elPesan)) return;
+        (hasil.data.data.skill || []).forEach(function (s) { skillMap[s.kode] = s; });
+        muat(1);
+    }, ...tokenHeader());
+}
+</script>
+</body>
+</html>

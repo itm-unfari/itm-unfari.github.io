@@ -1,0 +1,415 @@
+<!DOCTYPE html>
+<html lang="id" data-judul="taksonomi.judul_halaman">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Internal Talent Marketplace</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=Plus+Jakarta+Sans:wght@400..700&display=swap" rel="stylesheet">
+  <script src="/assets/js/prapasang.js"></script>
+  <link rel="stylesheet" href="/assets/css/app.css">
+</head>
+<body>
+
+<main class="mx-auto max-w-4xl px-5 py-6 space-y-5">
+  <div id="pesan" hidden role="alert"></div>
+
+  <section class="kartu p-6">
+    <h2 class="eyebrow text-tinta-redup mb-4" data-i18n="taksonomi.aktif_judul"></h2>
+    <div id="ringkasAktif" class="space-y-5"></div>
+  </section>
+
+  <section id="kartuJelajah" class="kartu p-6" hidden>
+    <h2 class="eyebrow text-tinta-redup mb-4" data-i18n="taksonomi.jelajah_judul"></h2>
+    <div class="grid gap-3 sm:grid-cols-2 mb-4">
+      <input id="cariSkill" type="search" class="medan" data-i18n-placeholder="taksonomi.cari_skill" data-i18n-label="taksonomi.cari_skill">
+      <select id="saringKelompok" class="medan" data-i18n-label="taksonomi.saring_kelompok"></select>
+    </div>
+    <p id="jumlahTampil" class="text-sm text-tinta-redup mb-2" aria-live="polite"></p>
+    <div id="daftarSkill" class="space-y-6"></div>
+  </section>
+
+  <section class="kartu p-6">
+    <h2 class="eyebrow text-tinta-redup mb-4" data-i18n="taksonomi.riwayat_judul"></h2>
+    <div id="wadahRiwayat"></div>
+  </section>
+
+  <section id="kartuImpor" class="kartu p-6" hidden>
+    <h2 class="eyebrow text-tinta-redup mb-2" data-i18n="taksonomi.impor_judul"></h2>
+    <p class="text-sm text-tinta-redup mb-4" data-i18n="taksonomi.impor_ket"></p>
+    <div id="pesanImpor" hidden role="alert"></div>
+    <label for="berkas" class="block text-sm font-medium mb-1.5" data-i18n="taksonomi.pilih_berkas"></label>
+    <input id="berkas" type="file" accept=".json,application/json" class="medan">
+
+    <div id="pratinjau" class="mt-5 space-y-4" hidden>
+      <h3 class="font-medium" data-i18n="taksonomi.pratinjau"></h3>
+      <dl id="ringkasPratinjau" class="grid gap-3 grid-cols-2 sm:grid-cols-4 text-sm"></dl>
+      <ul id="catatanPratinjau" class="space-y-1 text-sm"></ul>
+      <label class="flex items-start gap-2 text-sm">
+        <input id="aktifkan" type="checkbox" class="mt-1">
+        <span data-i18n="taksonomi.aktifkan"></span>
+      </label>
+      <div class="flex flex-wrap gap-2">
+        <button type="button" id="tombolImpor" class="tombol-utama" data-i18n="taksonomi.impor"></button>
+        <button type="button" id="tombolBatalImpor" class="tombol-halus" data-i18n="umum.batal"></button>
+      </div>
+    </div>
+  </section>
+</main>
+
+<script type="module">
+import { getJSON, postJSON } from "/assets/js/jscroot/api.js";
+import { asal, PERAN } from "/assets/js/config.js";
+import { requireLogin, requireRole, tokenHeader, getUser } from "/assets/js/auth.js";
+import { pesan, sembunyikan, sehat, el, kosongkan, lencana, tabel, baris, kosong } from "/assets/js/ui.js";
+import { t, bahasa } from "/assets/js/i18n.js";
+import { pasang } from "/assets/js/nav.js";
+
+const POLA_VERSI = /^v\d+$/;
+const POLA_KODE = /^[A-Z]{3}-\d{2}$/;
+const MAKS_CATATAN = 6;
+
+if (requireLogin() && requireRole("H-08")) {
+    pasang("H-08");
+    const elPesan = document.getElementById("pesan");
+    const elPesanImpor = document.getElementById("pesanImpor");
+    const elRingkas = document.getElementById("ringkasAktif");
+    const kartuJelajah = document.getElementById("kartuJelajah");
+    const inCari = document.getElementById("cariSkill");
+    const selKelompok = document.getElementById("saringKelompok");
+    const elJumlahTampil = document.getElementById("jumlahTampil");
+    const elDaftarSkill = document.getElementById("daftarSkill");
+    const wadahRiwayat = document.getElementById("wadahRiwayat");
+    const kartuImpor = document.getElementById("kartuImpor");
+    const inBerkas = document.getElementById("berkas");
+    const elPratinjau = document.getElementById("pratinjau");
+    const elRingkasPratinjau = document.getElementById("ringkasPratinjau");
+    const elCatatan = document.getElementById("catatanPratinjau");
+    const chkAktifkan = document.getElementById("aktifkan");
+    const btnImpor = document.getElementById("tombolImpor");
+    const btnBatal = document.getElementById("tombolBatalImpor");
+
+    const bolehImpor = (getUser() || {}).role === PERAN.HR;
+    let aktif = null;
+    let calon = null;
+
+    function namaBi(nama, cadangan) {
+        return (nama && (nama[bahasa()] || nama.id)) || cadangan || "";
+    }
+
+    function tanggal(x) {
+        const d = new Date(x);
+        return isNaN(d) ? "" : d.toLocaleDateString(bahasa() === "en" ? "en-GB" : "id-ID");
+    }
+
+    // Draf wajib selalu membawa lencana "belum ditelaah" yang mencolok, di
+    // setiap tempat status taksonomi tampil.
+    function lencanaTaksonomi(status) {
+        const l = status === "draf"
+            ? lencana(t("taksonomi.draf_belum_ditelaah"), "tinjau")
+            : status === "ditelaah"
+                ? lencana(t("status.taksonomi.ditelaah"), "sah")
+                : lencana(String(status || ""), "netral");
+        l.dataset.uji = "status-taksonomi";
+        return l;
+    }
+
+    function butirRingkas(wadah, label, isi) {
+        const d = el("div", "min-w-0");
+        d.appendChild(el("dt", "text-mikro text-tinta-redup", label));
+        const dd = el("dd", "font-medium break-words");
+        if (isi instanceof Node) dd.appendChild(isi); else dd.textContent = String(isi == null ? "" : isi);
+        d.appendChild(dd);
+        wadah.appendChild(d);
+    }
+
+    // ── taksonomi aktif ──
+    function muatAktif() {
+        getJSON(asal + "/api/skill", function (hasil) {
+            if (!sehat(hasil, elPesan)) return;
+            aktif = hasil.data.data || {};
+            gambarAktif();
+            siapkanSaringan();
+            gambarSkill();
+        }, ...tokenHeader());
+    }
+
+    function hitungPerKelompok(daftarSkill) {
+        const n = {};
+        (daftarSkill || []).forEach(function (s) { n[s.kelompok] = (n[s.kelompok] || 0) + 1; });
+        return n;
+    }
+
+    function gambarAktif() {
+        kosongkan(elRingkas);
+        const atas = el("div", "flex flex-wrap items-center gap-3");
+        atas.appendChild(el("span", "font-data text-2xl font-medium", aktif.versi || ""));
+        atas.appendChild(lencanaTaksonomi(aktif.status));
+        elRingkas.appendChild(atas);
+        if (aktif.status === "draf") {
+            elRingkas.appendChild(el("p", "rounded-xl bg-tinjau-muda text-tinjau px-3 py-2 text-sm", t("taksonomi.draf_peringatan")));
+        }
+
+        const dl = el("dl", "grid gap-3 grid-cols-2 sm:grid-cols-3 text-sm");
+        butirRingkas(dl, t("taksonomi.sumber"), aktif.sumber || "");
+        butirRingkas(dl, t("taksonomi.jumlah_kelompok"), el("span", "font-data", String((aktif.kelompok || []).length)));
+        butirRingkas(dl, t("taksonomi.jumlah_skill"), el("span", "font-data", String((aktif.skill || []).length)));
+        elRingkas.appendChild(dl);
+
+        const n = hitungPerKelompok(aktif.skill);
+        const blokK = el("div");
+        blokK.appendChild(el("h3", "eyebrow text-tinta-redup mb-2", t("taksonomi.kelompok_judul")));
+        const tk = tabel([t("taksonomi.kolom_kode"), t("taksonomi.kolom_kelompok"), t("taksonomi.kolom_jumlah_skill")]);
+        const daftarK = aktif.kelompok || [];
+        if (!daftarK.length) tk.tbody.appendChild(kosong(3, t("umum.tidak_ada_data")));
+        daftarK.forEach(function (k) {
+            tk.tbody.appendChild(baris([el("span", "font-data", k.kode), namaBi(k.nama, k.kode), el("span", "font-data", String(n[k.kode] || 0))]));
+        });
+        blokK.appendChild(tk.wadah);
+        elRingkas.appendChild(blokK);
+
+        const tingkat = aktif.tingkat || {};
+        if (Object.keys(tingkat).length) {
+            const blokT = el("div");
+            blokT.appendChild(el("h3", "eyebrow text-tinta-redup mb-2", t("taksonomi.tingkat_judul")));
+            const tt = tabel([t("taksonomi.kolom_tingkat"), t("taksonomi.kolom_deskripsi")]);
+            Object.keys(tingkat).sort().forEach(function (kunci) {
+                const d = tingkat[kunci] || {};
+                const nama = el("div", "min-w-[7rem]");
+                nama.appendChild(el("span", "font-data text-tinta-redup mr-2", kunci));
+                nama.appendChild(document.createTextNode(namaBi(d.nama, t("tingkat." + kunci))));
+                tt.tbody.appendChild(baris([nama, namaBi(d.deskripsi, "")]));
+            });
+            blokT.appendChild(tt.wadah);
+            elRingkas.appendChild(blokT);
+        }
+    }
+
+    function siapkanSaringan() {
+        kosongkan(selKelompok);
+        const semua = el("option", "", t("taksonomi.semua_kelompok"));
+        semua.value = "";
+        selKelompok.appendChild(semua);
+        (aktif.kelompok || []).forEach(function (k) {
+            const o = el("option", "", namaBi(k.nama, k.kode) + " (" + k.kode + ")");
+            o.value = k.kode;
+            selKelompok.appendChild(o);
+        });
+        kartuJelajah.hidden = false;
+    }
+
+    function teksRujukan(v) {
+        if (v == null) return "";
+        if (Array.isArray(v)) return v.map(String).join(", ");
+        if (typeof v === "object") return Object.values(v).map(String).join(", ");
+        return String(v);
+    }
+
+    function gambarSkill() {
+        if (!aktif) return;
+        kosongkan(elDaftarSkill);
+        const cari = inCari.value.trim().toLowerCase();
+        const pilihK = selKelompok.value;
+        const cocok = (aktif.skill || []).filter(function (s) {
+            if (pilihK && s.kelompok !== pilihK) return false;
+            if (!cari) return true;
+            const nama = s.nama || {};
+            return [s.kode, nama.id, nama.en].some(function (x) { return x && String(x).toLowerCase().includes(cari); });
+        });
+        elJumlahTampil.textContent = t("taksonomi.jumlah_tampil", { n: cocok.length, total: (aktif.skill || []).length });
+        if (!cocok.length) {
+            elDaftarSkill.appendChild(el("p", "text-sm text-tinta-redup", t("taksonomi.skill_tidak_ditemukan")));
+            return;
+        }
+        const urutK = (aktif.kelompok || []).map(function (k) { return k.kode; });
+        const perK = {};
+        cocok.forEach(function (s) {
+            if (!perK[s.kelompok]) { perK[s.kelompok] = []; if (!urutK.includes(s.kelompok)) urutK.push(s.kelompok); }
+            perK[s.kelompok].push(s);
+        });
+        urutK.forEach(function (kode) {
+            if (!perK[kode]) return;
+            const k = (aktif.kelompok || []).find(function (x) { return x.kode === kode; });
+            const grup = el("div");
+            const h = el("h3", "flex flex-wrap items-baseline gap-2 border-b border-garis pb-2 mb-1");
+            h.appendChild(el("span", "font-medium", namaBi(k && k.nama, kode)));
+            h.appendChild(el("span", "font-data text-mikro text-tinta-redup", kode));
+            grup.appendChild(h);
+            perK[kode].forEach(function (s) {
+                const item = el("div", "py-3 border-b border-garis-tipis last:border-0");
+                item.dataset.kode = s.kode;
+                const baris1 = el("div", "flex flex-wrap items-baseline gap-2");
+                baris1.appendChild(el("span", "font-data text-sm text-tinta-redup", s.kode));
+                baris1.appendChild(el("span", "font-medium break-words", namaBi(s.nama, s.kode)));
+                item.appendChild(baris1);
+                const desk = namaBi(s.deskripsi, "");
+                if (desk) item.appendChild(el("p", "text-sm text-tinta-redup mt-1 break-words", desk));
+                const r = s.rujukan || {};
+                const esco = teksRujukan(r.esco), skkni = teksRujukan(r.skkni);
+                if (esco || skkni) {
+                    const ref = el("div", "flex flex-wrap gap-x-4 gap-y-1 mt-1 text-mikro text-tinta-redup");
+                    if (esco) ref.appendChild(el("span", "break-all", t("taksonomi.rujukan_esco", { nilai: esco })));
+                    if (skkni) ref.appendChild(el("span", "break-all", t("taksonomi.rujukan_skkni", { nilai: skkni })));
+                    item.appendChild(ref);
+                }
+                grup.appendChild(item);
+            });
+            elDaftarSkill.appendChild(grup);
+        });
+    }
+
+    inCari.addEventListener("input", gambarSkill);
+    selKelompok.addEventListener("change", gambarSkill);
+
+    // ── riwayat versi ──
+    function labelPeran(p) {
+        const kunci = "peran." + p;
+        const teks = t(kunci);
+        return teks !== kunci ? teks : String(p == null ? "" : p);
+    }
+
+    function muatRiwayat() {
+        getJSON(asal + "/api/taksonomi/versi", function (hasil) {
+            if (!sehat(hasil, elPesan)) return;
+            gambarRiwayat(hasil.data.data || []);
+        }, ...tokenHeader());
+    }
+
+    function gambarRiwayat(daftar) {
+        kosongkan(wadahRiwayat);
+        const kolom = [t("taksonomi.kolom_versi"), t("taksonomi.kolom_status"), t("taksonomi.kolom_aktif"), t("taksonomi.kolom_jumlah_skill"), t("umum.dibuat"), t("taksonomi.kolom_telaah")];
+        const { wadah, tbody } = tabel(kolom);
+        if (!daftar.length) tbody.appendChild(kosong(kolom.length, t("umum.tidak_ada_data")));
+        daftar.forEach(function (v) {
+            const telaah = v.telaah || [];
+            let selTelaah;
+            if (!telaah.length) {
+                selTelaah = el("span", "text-tinta-samar", t("taksonomi.belum_ada_telaah"));
+            } else {
+                selTelaah = el("ul", "space-y-1 min-w-[10rem]");
+                telaah.forEach(function (tl) {
+                    const li = el("li");
+                    li.appendChild(el("div", "", labelPeran(tl.peran) + " · " + tanggal(tl.tanggal)));
+                    if (tl.catatan) li.appendChild(el("div", "text-mikro text-tinta-redup break-words", tl.catatan));
+                    selTelaah.appendChild(li);
+                });
+            }
+            tbody.appendChild(baris([
+                el("span", "font-data font-medium", v.versi),
+                lencanaTaksonomi(v.status),
+                v.aktif ? lencana(t("umum.aktif"), "sah") : lencana(t("umum.nonaktif"), "netral"),
+                el("span", "font-data", String(v.jumlah != null ? v.jumlah : "")),
+                tanggal(v.dibuat),
+                selTelaah,
+            ]));
+        });
+        wadahRiwayat.appendChild(wadah);
+    }
+
+    // ── impor ──
+    function periksaCalon(obj) {
+        const catatan = [];
+        if (!POLA_VERSI.test(String(obj.versi || ""))) catatan.push(t("taksonomi.cek_versi"));
+        if (obj.status !== "draf" && obj.status !== "ditelaah") catatan.push(t("taksonomi.cek_status"));
+        const kodeKelompok = new Set((obj.kelompok || []).map(function (k) { return k && k.kode; }));
+        const lengkap = function (x) { return x && typeof x === "object" && x.id && x.en; };
+        (obj.skill || []).forEach(function (s) {
+            s = s || {};
+            if (!POLA_KODE.test(String(s.kode || ""))) catatan.push(t("taksonomi.cek_kode", { kode: String(s.kode || "?") }));
+            else if (!lengkap(s.nama) || !lengkap(s.deskripsi)) catatan.push(t("taksonomi.cek_dwibahasa", { kode: s.kode }));
+            else if (!kodeKelompok.has(s.kelompok)) catatan.push(t("taksonomi.cek_kelompok", { kode: s.kode }));
+        });
+        (obj.kelompok || []).forEach(function (k) {
+            if (!k || !lengkap(k.nama)) catatan.push(t("taksonomi.cek_dwibahasa", { kode: String((k && k.kode) || "?") }));
+        });
+        return catatan;
+    }
+
+    function batalImpor() {
+        calon = null;
+        inBerkas.value = "";
+        chkAktifkan.checked = false;
+        elPratinjau.hidden = true;
+        kosongkan(elRingkasPratinjau);
+        kosongkan(elCatatan);
+    }
+
+    function gambarPratinjau(obj) {
+        kosongkan(elRingkasPratinjau);
+        kosongkan(elCatatan);
+        butirRingkas(elRingkasPratinjau, t("taksonomi.kolom_versi"), el("span", "font-data", String(obj.versi || "")));
+        butirRingkas(elRingkasPratinjau, t("taksonomi.kolom_status"), lencanaTaksonomi(obj.status));
+        butirRingkas(elRingkasPratinjau, t("taksonomi.jumlah_kelompok"), el("span", "font-data", String((obj.kelompok || []).length)));
+        butirRingkas(elRingkasPratinjau, t("taksonomi.jumlah_skill"), el("span", "font-data", String((obj.skill || []).length)));
+        if (obj.sumber) {
+            const li = el("li", "text-tinta-redup break-words", t("taksonomi.sumber_pratinjau", { sumber: String(obj.sumber) }));
+            elCatatan.appendChild(li);
+        }
+        const catatan = periksaCalon(obj);
+        catatan.slice(0, MAKS_CATATAN).forEach(function (c) {
+            elCatatan.appendChild(el("li", "rounded-lg bg-tinjau-muda text-tinjau px-3 py-1.5 break-words", c));
+        });
+        if (catatan.length > MAKS_CATATAN) {
+            elCatatan.appendChild(el("li", "text-tinta-redup", t("taksonomi.cek_lainnya", { n: catatan.length - MAKS_CATATAN })));
+        }
+        if (catatan.length) elCatatan.appendChild(el("li", "text-mikro text-tinta-redup", t("taksonomi.cek_ket")));
+        btnImpor.disabled = false;
+        elPratinjau.hidden = false;
+    }
+
+    inBerkas.addEventListener("change", function () {
+        sembunyikan(elPesanImpor);
+        calon = null;
+        elPratinjau.hidden = true;
+        const f = inBerkas.files && inBerkas.files[0];
+        if (!f) return;
+        const pembaca = new FileReader();
+        pembaca.onerror = function () { pesan(elPesanImpor, t("taksonomi.berkas_gagal_dibaca"), "tinjau"); };
+        pembaca.onload = function () {
+            let obj;
+            try {
+                obj = JSON.parse(String(pembaca.result));
+            } catch (e) {
+                pesan(elPesanImpor, t("taksonomi.json_tidak_sah"), "tinjau");
+                return;
+            }
+            if (!obj || typeof obj !== "object" || Array.isArray(obj) || !Array.isArray(obj.kelompok) || !Array.isArray(obj.skill)) {
+                pesan(elPesanImpor, t("taksonomi.bentuk_tidak_sah"), "tinjau");
+                return;
+            }
+            calon = obj;
+            gambarPratinjau(obj);
+        };
+        pembaca.readAsText(f);
+    });
+
+    chkAktifkan.addEventListener("change", function () { btnImpor.disabled = false; });
+    btnBatal.addEventListener("click", function () { sembunyikan(elPesanImpor); batalImpor(); });
+
+    btnImpor.addEventListener("click", function () {
+        if (!calon) return;
+        const aktifkan = chkAktifkan.checked;
+        if (aktifkan && calon.status === "draf" && !window.confirm(t("taksonomi.konfirmasi_aktif_draf"))) return;
+        sembunyikan(elPesanImpor);
+        btnImpor.disabled = true;
+        const badan = Object.assign({}, calon, { aktifkan: aktifkan });
+        postJSON(asal + "/api/taksonomi/impor", badan, function (hasil) {
+            if (!sehat(hasil, elPesanImpor)) return;
+            const meta = hasil.data.data || {};
+            const versi = meta.versi || calon.versi;
+            batalImpor();
+            const jadiAktif = meta.aktif != null ? meta.aktif : aktifkan;
+            pesan(elPesanImpor, t(jadiAktif ?"taksonomi.impor_berhasil_aktif" : "taksonomi.impor_berhasil", { versi: versi }), "sah");
+            muatAktif();
+            muatRiwayat();
+        }, ...tokenHeader());
+    });
+
+    if (bolehImpor) kartuImpor.hidden = false;
+    muatAktif();
+    muatRiwayat();
+}
+</script>
+</body>
+</html>

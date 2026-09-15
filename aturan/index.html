@@ -1,0 +1,558 @@
+<!DOCTYPE html>
+<html lang="id" data-judul="aturan.judul_halaman">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Internal Talent Marketplace</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=Plus+Jakarta+Sans:wght@400..700&display=swap" rel="stylesheet">
+  <script src="/assets/js/prapasang.js"></script>
+  <link rel="stylesheet" href="/assets/css/app.css">
+</head>
+<body>
+
+<main class="mx-auto max-w-5xl px-5 py-6 space-y-5">
+  <div id="pesan" hidden role="alert"></div>
+
+  <section class="kartu p-6">
+    <h2 class="eyebrow text-tinta-redup mb-2" data-i18n="aturan.daftar_judul">Versi aturan matching</h2>
+    <p class="text-sm text-tinta-redup mb-4" data-i18n="aturan.daftar_ket">Setiap perubahan membuat versi baru; hanya satu versi yang aktif dan dipakai siklus berikutnya.</p>
+    <div id="wadahDaftar"></div>
+    <div id="navDaftar"></div>
+  </section>
+
+  <section id="bagianDetail" class="kartu p-6" hidden data-uji="detail-aturan">
+    <div class="flex flex-wrap items-start justify-between gap-3 mb-4">
+      <h2 class="eyebrow text-tinta-redup" data-i18n="aturan.detail_judul">Detail versi</h2>
+      <button type="button" id="tombolTutupDetail" class="tombol-halus" data-i18n="umum.tutup">Tutup</button>
+    </div>
+    <div id="pesanDetail" hidden role="alert"></div>
+    <div id="wadahDetail" class="space-y-5"></div>
+  </section>
+
+  <section id="bagianLatih" class="kartu p-6" hidden>
+    <h2 class="eyebrow text-tinta-redup mb-2" data-i18n="aturan.latih_judul">Latih aturan dari riwayat mobilitas</h2>
+    <p class="text-sm text-tinta-redup mb-4" data-i18n="aturan.latih_ket">Pelatihan menghasilkan versi kandidat berasal "dipelajari" yang tidak pernah aktif dengan sendirinya. Mitigasi bias menekan fitur yang berkorelasi kuat dengan atribut terlindungi.</p>
+    <div class="flex flex-wrap gap-2">
+      <button type="button" id="tombolLatih" class="tombol-halus" data-i18n="aturan.latih">Latih aturan</button>
+      <button type="button" id="tombolLatihMitigasi" class="tombol-halus" data-i18n="aturan.latih_mitigasi">Latih dengan mitigasi bias</button>
+    </div>
+    <p id="statusLatih" class="mt-3 text-sm text-tinta-redup" role="status" hidden></p>
+  </section>
+
+  <section id="bagianBuat" class="kartu p-6" hidden>
+    <h2 class="eyebrow text-tinta-redup mb-2" data-i18n="aturan.buat_judul">Buat versi manual</h2>
+    <p class="text-sm text-tinta-redup mb-4" data-i18n="aturan.buat_ket">Versi baru dibuat dalam keadaan nonaktif. Aktifkan setelah ditinjau.</p>
+    <div id="pesanBuat" hidden role="alert"></div>
+    <form id="formBuat" class="space-y-4" novalidate>
+      <div class="grid gap-4 sm:grid-cols-3">
+        <div>
+          <label for="pengaliBawaan" class="block text-sm font-medium mb-1.5" data-i18n="aturan.pengali_bawaan">Pengali bawaan</label>
+          <input id="pengaliBawaan" type="number" class="medan font-data" min="0" step="0.1" value="1" required>
+        </div>
+        <div>
+          <label for="ambang" class="block text-sm font-medium mb-1.5" data-i18n="aturan.ambang">Ambang rekomendasi (0–100)</label>
+          <input id="ambang" type="number" class="medan font-data" min="0" max="100" step="1" required>
+        </div>
+        <div>
+          <label for="nilaiK" class="block text-sm font-medium mb-1.5" data-i18n="aturan.k">k (minimal 1)</label>
+          <input id="nilaiK" type="number" class="medan font-data" min="1" step="1" required>
+        </div>
+      </div>
+      <fieldset>
+        <legend class="block text-sm font-medium mb-1" data-i18n="aturan.pengali_skill">Pengali per skill (opsional)</legend>
+        <p class="text-mikro text-tinta-redup mb-2" data-i18n="aturan.pengali_skill_ket">Skill yang tidak disebut memakai pengali bawaan.</p>
+        <div id="barisPengali" class="space-y-2"></div>
+        <button type="button" id="tombolTambahPengali" class="tombol-halus mt-2" data-i18n="aturan.tambah_pengali">Tambah pengali skill</button>
+      </fieldset>
+      <div>
+        <label for="catatanAturan" class="block text-sm font-medium mb-1.5" data-i18n="aturan.catatan">Catatan</label>
+        <textarea id="catatanAturan" class="medan" rows="3" maxlength="1000"></textarea>
+      </div>
+      <button type="submit" id="tombolBuat" class="tombol-utama" data-i18n="aturan.buat_tombol">Buat versi</button>
+    </form>
+  </section>
+
+  <section class="kartu p-6">
+    <h2 class="eyebrow text-tinta-redup mb-2" data-i18n="aturan.perbandingan_judul">Perbandingan fairness: manual vs dipelajari vs dipelajari dengan mitigasi</h2>
+    <p class="text-sm text-tinta-redup mb-4" data-i18n="aturan.perbandingan_ket">Setiap versi dipelajari dijalankan pada siklus bayangan, sehingga fairness-nya bisa dibandingkan tanpa mengubah apa yang dilihat karyawan.</p>
+    <div id="wadahPerbandingan" data-uji="perbandingan-aturan"></div>
+    <h3 class="text-sm font-medium mt-5 mb-2" data-i18n="aturan.bayangan_judul">Siklus bayangan versi dipelajari</h3>
+    <div id="pesanBayangan" hidden role="alert"></div>
+    <ul id="daftarBayangan" class="space-y-2"></ul>
+  </section>
+</main>
+
+<script type="module">
+import { getJSON, postJSON } from "/assets/js/jscroot/api.js";
+import { getQueryString } from "/assets/js/jscroot/url.js";
+import { asal, PERAN } from "/assets/js/config.js";
+import { requireLogin, requireRole, tokenHeader, getUser } from "/assets/js/auth.js";
+import { pesan, sembunyikan, sehat, el, kosongkan, lencana, tabel, baris, kosong } from "/assets/js/ui.js";
+import { t, bahasa } from "/assets/js/i18n.js";
+import { pasang } from "/assets/js/nav.js";
+import { namaSkill, fmt } from "/assets/js/kontribusi.js";
+
+const PER_HALAMAN = 20;
+const BATAS_TUNGGU = 40;
+
+if (requireLogin() && requireRole("H-05")) {
+    pasang("H-05");
+    const elPesan = document.getElementById("pesan");
+    const elPesanDetail = document.getElementById("pesanDetail");
+    const elPesanBuat = document.getElementById("pesanBuat");
+    const wadahDaftar = document.getElementById("wadahDaftar");
+    const navDaftar = document.getElementById("navDaftar");
+    const bagianDetail = document.getElementById("bagianDetail");
+    const wadahDetail = document.getElementById("wadahDetail");
+    const statusLatih = document.getElementById("statusLatih");
+    const form = document.getElementById("formBuat");
+    const barisPengali = document.getElementById("barisPengali");
+    const tombolBuat = document.getElementById("tombolBuat");
+    const elPengaliBawaan = document.getElementById("pengaliBawaan");
+    const elAmbang = document.getElementById("ambang");
+    const elK = document.getElementById("nilaiK");
+    const elCatatan = document.getElementById("catatanAturan");
+
+    // Hanya HR yang menulis (API.md). PAKAR dan peran baca lain tidak melihat
+    // kontrol buat/latih/aktifkan sama sekali.
+    const bolehTulis = getUser().role === PERAN.HR;
+    const lokal = bahasa() === "en" ? "en-GB" : "id-ID";
+
+    let halaman = 1;
+    let daftarTerakhir = [];
+    let skillMap = {};
+    let kelompok = [];
+    let formTerisi = false;
+
+    function tanggal(x) {
+        const d = new Date(x);
+        return x && !isNaN(d) ? d.toLocaleDateString(lokal) : "—";
+    }
+
+    function persen(r) {
+        return typeof r === "number" ? (r * 100).toFixed(1) + "%" : "—";
+    }
+
+    function tombol(teks, kelas) {
+        const b = el("button", kelas || "tombol-halus", teks);
+        b.type = "button";
+        return b;
+    }
+
+    function denganTombol(b, cb) {
+        const teksAsli = b.textContent;
+        b.disabled = true;
+        b.textContent = t("umum.memproses");
+        return function (hasil) {
+            b.disabled = false;
+            b.textContent = teksAsli;
+            cb(hasil);
+        };
+    }
+
+    function perluTandaAI(a) { return a.asal === "dipelajari" && !a.aktif; }
+
+    function fiturProksi(a) { return Array.isArray(a.fitur_proksi) ? a.fitur_proksi : []; }
+
+    function lencanaAsal(a) { return lencana(t("aturan.asal_" + a.asal), "netral"); }
+
+    function lencanaAktif(a) {
+        return a.aktif ? lencana(t("umum.aktif"), "sah") : lencana(t("umum.nonaktif"), "netral");
+    }
+
+    function lencanaAI() {
+        const l = lencana(t("umum.tandaAI"), "tinjau");
+        l.dataset.uji = "tanda-ai";
+        return l;
+    }
+
+    function gambarNav(wadah, meta, muat) {
+        kosongkan(wadah);
+        const total = meta.total_pages || 1;
+        const n = meta.page || 1;
+        if (total <= 1) return;
+        const nav = el("div", "flex flex-wrap items-center justify-between gap-2 mt-4");
+        const sebelum = tombol(t("umum.sebelumnya"));
+        sebelum.disabled = n <= 1;
+        sebelum.addEventListener("click", function () { muat(n - 1); });
+        const sesudah = tombol(t("umum.berikutnya"));
+        sesudah.disabled = n >= total;
+        sesudah.addEventListener("click", function () { muat(n + 1); });
+        nav.appendChild(sebelum);
+        nav.appendChild(el("span", "text-sm text-tinta-redup font-data", t("umum.halaman", { n: n, total: total })));
+        nav.appendChild(sesudah);
+        wadah.appendChild(nav);
+    }
+
+    // ── daftar versi ──
+
+    function muatDaftar(n) {
+        getJSON(asal + "/api/aturan?page=" + encodeURIComponent(n) + "&limit=" + PER_HALAMAN, function (hasil) {
+            if (!sehat(hasil, elPesan)) return;
+            const daftar = hasil.data.data || [];
+            const meta = hasil.data.meta || {};
+            halaman = meta.page || n;
+            daftarTerakhir = daftar;
+            gambarDaftar(daftar);
+            gambarNav(navDaftar, meta, muatDaftar);
+            isiFormDariAktif(daftar);
+        }, ...tokenHeader());
+    }
+
+    function gambarDaftar(daftar) {
+        kosongkan(wadahDaftar);
+        const { wadah, tbody } = tabel([
+            t("aturan.kolom_versi"), t("aturan.kolom_asal"), t("aturan.kolom_status"), t("aturan.kolom_ambang"),
+            t("aturan.kolom_k"), t("aturan.kolom_tepi"), t("aturan.kolom_pengali"), t("aturan.kolom_akurasi"),
+            t("umum.dibuat"), t("aturan.catatan"), "",
+        ]);
+        if (!daftar.length) tbody.appendChild(kosong(11, t("aturan.belum_ada_versi")));
+        const terpilih = getQueryString().aturan;
+        daftar.forEach(function (a) {
+            const versi = el("div", "flex flex-wrap items-center gap-1.5 min-w-[7rem]");
+            versi.appendChild(el("span", "font-data font-medium", a.versi));
+            if (perluTandaAI(a)) versi.appendChild(lencanaAI());
+            const proksi = fiturProksi(a);
+            if (proksi.length) versi.appendChild(lencana(t("aturan.jumlah_proksi", { n: proksi.length }), "tinjau"));
+            const detail = tombol(t("umum.detail"));
+            detail.addEventListener("click", function () { pilihDetail(a.id); });
+            const tr = baris([
+                versi,
+                lencanaAsal(a),
+                lencanaAktif(a),
+                el("span", "font-data", fmt(a.ambang_rekomendasi)),
+                el("span", "font-data", a.k),
+                t(a.pakai_tepi ? "umum.ya" : "umum.tidak"),
+                el("span", "font-data", Object.keys(a.pengali || {}).length),
+                el("span", "font-data", persen(a.akurasi)),
+                el("span", "whitespace-nowrap", tanggal(a.dibuat)),
+                el("span", "block min-w-[10rem] break-words", a.catatan || "—"),
+                detail,
+            ]);
+            if (a.id === terpilih) tr.className += " bg-utama-muda";
+            tbody.appendChild(tr);
+        });
+        wadahDaftar.appendChild(wadah);
+    }
+
+    // Formulir diisi sekali dari versi aktif supaya HR mengubah dari titik
+    // yang sedang berlaku, bukan dari angka karangan.
+    function isiFormDariAktif(daftar) {
+        if (formTerisi || !bolehTulis) return;
+        const aktif = daftar.find(function (a) { return a.aktif; });
+        if (!aktif) return;
+        formTerisi = true;
+        elPengaliBawaan.value = aktif.pengali_bawaan;
+        elAmbang.value = aktif.ambang_rekomendasi;
+        elK.value = aktif.k;
+    }
+
+    // ── detail versi ──
+
+    function pilihDetail(id) {
+        const u = new URL(window.location.href);
+        if (id) u.searchParams.set("aturan", id); else u.searchParams.delete("aturan");
+        history.replaceState(null, "", u.pathname + u.search);
+        tampilkanDetail();
+        gambarDaftar(daftarTerakhir);
+        if (id) bagianDetail.scrollIntoView({ block: "start" });
+    }
+
+    function tampilkanDetail() {
+        const id = getQueryString().aturan;
+        kosongkan(wadahDetail);
+        sembunyikan(elPesanDetail);
+        bagianDetail.hidden = !id;
+        if (!id) return;
+        getJSON(asal + "/api/aturan/" + encodeURIComponent(id), function (hasil) {
+            if (!sehat(hasil, elPesanDetail)) return;
+            if (getQueryString().aturan !== id) return;
+            gambarDetail(hasil.data.data);
+        }, ...tokenHeader());
+    }
+
+    function sel(label, nilai, kelasNilai) {
+        const d = el("div", "min-w-0");
+        d.appendChild(el("dt", "text-mikro text-tinta-redup", label));
+        const dd = el("dd", "mt-0.5 break-words " + (kelasNilai || ""));
+        if (nilai instanceof Node) dd.appendChild(nilai); else dd.textContent = nilai == null || nilai === "" ? "—" : String(nilai);
+        d.appendChild(dd);
+        return d;
+    }
+
+    function gambarDetail(a) {
+        kosongkan(wadahDetail);
+
+        const kepala = el("div", "flex flex-wrap items-center gap-2");
+        kepala.appendChild(el("span", "judul-halaman text-lg font-data", a.versi));
+        kepala.appendChild(lencanaAsal(a));
+        kepala.appendChild(lencanaAktif(a));
+        if (perluTandaAI(a)) kepala.appendChild(lencanaAI());
+        wadahDetail.appendChild(kepala);
+
+        const info = el("dl", "grid gap-x-6 gap-y-3 text-sm sm:grid-cols-3");
+        info.appendChild(sel(t("aturan.pengali_bawaan"), fmt(a.pengali_bawaan), "font-data"));
+        info.appendChild(sel(t("aturan.kolom_ambang"), fmt(a.ambang_rekomendasi), "font-data"));
+        info.appendChild(sel(t("aturan.kolom_k"), a.k, "font-data"));
+        info.appendChild(sel(t("aturan.kolom_tepi"), t(a.pakai_tepi ? "umum.ya" : "umum.tidak")));
+        info.appendChild(sel(t("aturan.kolom_akurasi"), persen(a.akurasi), "font-data"));
+        info.appendChild(sel(t("umum.dibuat"), tanggal(a.dibuat)));
+        info.appendChild(sel(t("umum.oleh"), a.dibuat_oleh, "font-data"));
+        if (a.tugas_id) info.appendChild(sel(t("aturan.tugas"), a.tugas_id, "font-data"));
+        if (a.siklus_bayangan_id) {
+            const tautan = el("a", "text-utama hover:underline", t("aturan.lihat_fairness_bayangan"));
+            tautan.href = "/fairness/?siklus=" + encodeURIComponent(a.siklus_bayangan_id);
+            info.appendChild(sel(t("aturan.siklus_bayangan"), tautan));
+        }
+        wadahDetail.appendChild(info);
+        if (a.catatan) {
+            const cat = el("div", "text-sm");
+            cat.appendChild(el("div", "text-mikro text-tinta-redup", t("aturan.catatan")));
+            cat.appendChild(el("p", "whitespace-pre-wrap break-words", a.catatan));
+            wadahDetail.appendChild(cat);
+        }
+
+        const judulPengali = el("h3", "text-sm font-medium", t("aturan.pengali_skill_judul"));
+        wadahDetail.appendChild(judulPengali);
+        const kode = Object.keys(a.pengali || {}).sort();
+        if (!kode.length) {
+            wadahDetail.appendChild(el("p", "text-sm text-tinta-redup", t("aturan.tanpa_pengali_skill", { n: fmt(a.pengali_bawaan) })));
+        } else {
+            const { wadah, tbody } = tabel([t("aturan.kolom_skill"), t("aturan.kolom_pengali_nilai")]);
+            kode.forEach(function (k) {
+                tbody.appendChild(baris([namaSkill(k, skillMap), el("span", "font-data", fmt(a.pengali[k]))]));
+            });
+            wadahDetail.appendChild(wadah);
+        }
+
+        const proksi = fiturProksi(a);
+        if (a.asal === "dipelajari") wadahDetail.appendChild(kotakProksi(proksi));
+
+        if (a.aktif) {
+            wadahDetail.appendChild(el("p", "text-sm text-tinta-redup", t("aturan.sedang_aktif")));
+        } else if (bolehTulis) {
+            const b = tombol(t("aturan.aktifkan"), proksi.length ? "tombol-halus" : "tombol-utama");
+            b.dataset.uji = "aktifkan-aturan";
+            b.addEventListener("click", function () { aktifkan(a, proksi, b); });
+            wadahDetail.appendChild(b);
+        }
+    }
+
+    // Hasil cek proksi ditampilkan SEBELUM tombol aktifkan (API.md): HR harus
+    // melihatnya dulu, bukan menemukannya setelah versi dipakai.
+    function kotakProksi(proksi) {
+        const kotak = el("div", "rounded-xl p-4 space-y-2 " + (proksi.length ? "border border-tinjau bg-tinjau-muda text-tinjau" : "bg-sah-muda text-sah"));
+        kotak.setAttribute("role", "note");
+        kotak.dataset.uji = "fitur-proksi";
+        if (!proksi.length) {
+            kotak.appendChild(el("p", "text-sm font-medium", t("aturan.proksi_kosong")));
+            return kotak;
+        }
+        kotak.appendChild(el("p", "text-sm font-semibold", t("aturan.proksi_ada_judul", { n: proksi.length })));
+        kotak.appendChild(el("p", "text-sm", t("aturan.proksi_ada_ket")));
+        const ul = el("ul", "flex flex-wrap gap-2");
+        proksi.forEach(function (f) { ul.appendChild(el("li", "rounded-md border border-tinjau px-2 py-0.5 font-data text-sm break-all", f)); });
+        kotak.appendChild(ul);
+        return kotak;
+    }
+
+    function aktifkan(a, proksi, b) {
+        sembunyikan(elPesanDetail);
+        const teks = proksi.length
+            ? t("aturan.konfirmasi_aktifkan_proksi", { versi: a.versi, fitur: proksi.join(", ") })
+            : t("aturan.konfirmasi_aktifkan", { versi: a.versi });
+        if (!window.confirm(teks)) return;
+        postJSON(asal + "/api/aturan/" + encodeURIComponent(a.id) + "/aktifkan", {}, denganTombol(b, function (hasil) {
+            if (!sehat(hasil, elPesanDetail)) return;
+            pesan(elPesan, t("aturan.diaktifkan", { versi: a.versi }), "sah");
+            muatDaftar(halaman);
+            muatBayangan();
+            tampilkanDetail();
+        }), ...tokenHeader());
+    }
+
+    // ── perbandingan: tautan siklus bayangan ──
+
+    function muatBayangan() {
+        getJSON(asal + "/api/aturan?limit=200", function (hasil) {
+            if (!sehat(hasil, document.getElementById("pesanBayangan"))) return;
+            const ul = document.getElementById("daftarBayangan");
+            kosongkan(ul);
+            const dipelajari = (hasil.data.data || []).filter(function (a) { return a.asal === "dipelajari" && a.siklus_bayangan_id; });
+            if (!dipelajari.length) {
+                ul.appendChild(el("li", "text-sm text-tinta-redup", t("aturan.bayangan_kosong")));
+            }
+            dipelajari.forEach(function (a) {
+                const li = el("li", "flex flex-wrap items-center gap-2 text-sm");
+                const tautan = el("a", "text-utama hover:underline", t("aturan.tautan_fairness_versi", { versi: a.versi }));
+                tautan.href = "/fairness/?siklus=" + encodeURIComponent(a.siklus_bayangan_id);
+                tautan.dataset.uji = "tautan-fairness-bayangan";
+                li.appendChild(tautan);
+                li.appendChild(el("span", "font-data text-mikro text-tinta-redup", t("aturan.akurasi_singkat", { akurasi: persen(a.akurasi) })));
+                if (a.aktif) li.appendChild(lencanaAktif(a));
+                if (perluTandaAI(a)) li.appendChild(lencanaAI());
+                if (a.catatan) li.appendChild(el("span", "basis-full text-mikro text-tinta-redup break-words", a.catatan));
+                ul.appendChild(li);
+            });
+        }, ...tokenHeader());
+    }
+
+    // ── latih ──
+
+    function tampilStatusLatih(teks) {
+        statusLatih.textContent = teks;
+        statusLatih.hidden = false;
+    }
+
+    function tungguTugas(tugasId, sisa) {
+        getJSON(asal + "/api/tugas-ai/" + encodeURIComponent(tugasId), function (hasil) {
+            if (!sehat(hasil, elPesan)) return;
+            const tugas = hasil.data.data;
+            if (tugas.status === "selesai") {
+                statusLatih.hidden = true;
+                pesan(elPesan, t("aturan.latih_selesai"), "sah");
+                muatDaftar(1);
+                muatBayangan();
+                if (tugas.hasil_id) pilihDetail(tugas.hasil_id);
+            } else if (tugas.status === "gagal") {
+                tampilStatusLatih(t("aturan.latih_gagal"));
+            } else if (sisa <= 0) {
+                tampilStatusLatih(t("usulanSkill.masih_diproses"));
+            } else {
+                tampilStatusLatih(t("aturan.latih_diproses", { status: t("status.tugas." + tugas.status) }));
+                setTimeout(function () { tungguTugas(tugasId, sisa - 1); }, 1500);
+            }
+        }, ...tokenHeader());
+    }
+
+    function latih(mitigasi, b) {
+        sembunyikan(elPesan);
+        postJSON(asal + "/api/aturan/latih", { mitigasi_aktif: mitigasi }, denganTombol(b, function (hasil) {
+            if (!sehat(hasil, elPesan)) return;
+            const tugas = hasil.data.data;
+            tampilStatusLatih(t("aturan.latih_diproses", { status: t("status.tugas." + tugas.status) }));
+            tungguTugas(tugas.id, BATAS_TUNGGU);
+        }), ...tokenHeader());
+    }
+
+    // ── buat versi manual ──
+
+    function muatSkill() {
+        getJSON(asal + "/api/skill", function (hasil) {
+            if (!sehat(hasil, elPesan)) return;
+            const d = hasil.data.data || {};
+            skillMap = {};
+            (d.skill || []).forEach(function (s) { skillMap[s.kode] = s; });
+            kelompok = d.kelompok || [];
+            tampilkanDetail();
+        }, ...tokenHeader());
+    }
+
+    function pilihanSkill() {
+        const sel = document.createElement("select");
+        sel.className = "medan min-w-0 flex-1";
+        sel.setAttribute("aria-label", t("aturan.kolom_skill"));
+        const kosongOpt = el("option", "", t("aturan.pilih_skill"));
+        kosongOpt.value = "";
+        sel.appendChild(kosongOpt);
+        const perKelompok = {};
+        Object.keys(skillMap).forEach(function (k) {
+            const s = skillMap[k];
+            (perKelompok[s.kelompok] = perKelompok[s.kelompok] || []).push(s);
+        });
+        const urutKelompok = kelompok.map(function (g) { return g.kode; });
+        Object.keys(perKelompok).forEach(function (g) { if (!urutKelompok.includes(g)) urutKelompok.push(g); });
+        urutKelompok.forEach(function (g) {
+            if (!perKelompok[g]) return;
+            const info = kelompok.find(function (x) { return x.kode === g; });
+            const grup = document.createElement("optgroup");
+            grup.label = info ? (info.nama[bahasa()] || info.nama.id) : g;
+            perKelompok[g].sort(function (x, y) { return x.kode < y.kode ? -1 : 1; }).forEach(function (s) {
+                const opt = el("option", "", namaSkill(s.kode, skillMap));
+                opt.value = s.kode;
+                grup.appendChild(opt);
+            });
+            sel.appendChild(grup);
+        });
+        return sel;
+    }
+
+    function tambahBarisPengali() {
+        const b = el("div", "flex flex-wrap items-center gap-2 sm:flex-nowrap");
+        b.dataset.baris = "pengali";
+        const sel = pilihanSkill();
+        const angka = document.createElement("input");
+        angka.type = "number";
+        angka.min = "0";
+        angka.step = "0.1";
+        angka.value = "1";
+        angka.className = "medan font-data w-28";
+        angka.setAttribute("aria-label", t("aturan.kolom_pengali_nilai"));
+        const hapus = tombol(t("umum.hapus"));
+        hapus.addEventListener("click", function () { b.remove(); });
+        b.appendChild(sel);
+        b.appendChild(angka);
+        b.appendChild(hapus);
+        barisPengali.appendChild(b);
+    }
+
+    function angkaSah(teks) {
+        return teks.trim() !== "" && Number.isFinite(Number(teks));
+    }
+
+    form.addEventListener("submit", function (e) {
+        e.preventDefault();
+        sembunyikan(elPesanBuat);
+        const tolak = function (kunci) { pesan(elPesanBuat, t(kunci), "tinjau"); };
+        if (!angkaSah(elPengaliBawaan.value) || Number(elPengaliBawaan.value) < 0) return tolak("aturan.galat_pengali_bawaan");
+        const ambang = Number(elAmbang.value);
+        if (!angkaSah(elAmbang.value) || ambang < 0 || ambang > 100) return tolak("aturan.galat_ambang");
+        const k = Number(elK.value);
+        if (!angkaSah(elK.value) || !Number.isInteger(k) || k < 1) return tolak("aturan.galat_k");
+        const pengali = {};
+        const barisan = barisPengali.querySelectorAll("[data-baris=pengali]");
+        for (const b of barisan) {
+            const kode = b.querySelector("select").value;
+            const nilai = b.querySelector("input").value;
+            if (!kode || !angkaSah(nilai) || Number(nilai) < 0) return tolak("aturan.galat_pengali_skill");
+            if (Object.prototype.hasOwnProperty.call(pengali, kode)) return tolak("aturan.galat_skill_ganda");
+            pengali[kode] = Number(nilai);
+        }
+        const badan = {
+            pengali: pengali,
+            pengali_bawaan: Number(elPengaliBawaan.value),
+            ambang_rekomendasi: ambang,
+            k: k,
+            catatan: elCatatan.value.trim(),
+        };
+        postJSON(asal + "/api/aturan", badan, denganTombol(tombolBuat, function (hasil) {
+            if (!sehat(hasil, elPesanBuat)) return;
+            const a = hasil.data.data || {};
+            kosongkan(barisPengali);
+            elCatatan.value = "";
+            pesan(elPesanBuat, t("aturan.versi_dibuat", { versi: a.versi || "" }), "sah");
+            muatDaftar(1);
+        }), ...tokenHeader());
+    });
+
+    document.getElementById("tombolTutupDetail").addEventListener("click", function () { pilihDetail(""); });
+
+    muatSkill();
+    muatDaftar(1);
+    muatBayangan();
+
+    if (bolehTulis) {
+        document.getElementById("bagianLatih").hidden = false;
+        document.getElementById("bagianBuat").hidden = false;
+        const tombolLatih = document.getElementById("tombolLatih");
+        const tombolLatihMitigasi = document.getElementById("tombolLatihMitigasi");
+        tombolLatih.addEventListener("click", function () { latih(false, tombolLatih); });
+        tombolLatihMitigasi.addEventListener("click", function () { latih(true, tombolLatihMitigasi); });
+        document.getElementById("tombolTambahPengali").addEventListener("click", tambahBarisPengali);
+    }
+}
+</script>
+</body>
+</html>

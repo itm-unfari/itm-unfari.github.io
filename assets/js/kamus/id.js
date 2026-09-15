@@ -118,4 +118,6 @@ export default {
     "galat.butir_sudah_diputuskan": "Butir usulan ini sudah pernah diputuskan.",
     "galat.bahasa_tidak_sah": "Bahasa harus Indonesia atau Inggris.",
     "galat.riwayat_kosong": "Belum ada riwayat mobilitas untuk dilatih.",
+    "galat.kondisi_batas_tidak_sah": "Kondisi batas tidak sah: keempat dimensi (D1-D4) wajib diisi.",
+    "galat.kondisi_batas_tidak_aktif": "Belum ada kondisi batas yang aktif.",
 };

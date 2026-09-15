@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html lang="id" data-judul="pakar.judul_halaman">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Internal Talent Marketplace</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=Plus+Jakarta+Sans:wght@400..700&display=swap" rel="stylesheet">
+  <script src="/assets/js/prapasang.js"></script>
+  <link rel="stylesheet" href="/assets/css/app.css">
+</head>
+<body>
+
+<main class="mx-auto max-w-4xl px-5 py-6 space-y-5">
+  <div id="pesan" hidden role="alert"></div>
+
+  <section class="kartu p-6">
+    <h2 class="eyebrow text-tinta-redup mb-2" data-i18n="pakar.pengantar_judul">Mode pakar</h2>
+    <p class="text-sm text-tinta-redup" data-i18n="pakar.pengantar">Anda melihat aplikasi dari berbagai sudut pandang di atas data sintetis, tanpa bisa mengubah apa pun.</p>
+  </section>
+
+  <section class="kartu p-6">
+    <h2 class="eyebrow text-tinta-redup mb-2" data-i18n="pakar.sudut_judul">Sudut pandang karyawan</h2>
+    <p class="text-sm text-tinta-redup mb-4" data-i18n="pakar.sudut_ket">Pilih satu karyawan sintetis untuk melihat rekomendasi dan penjelasan seperti yang ia lihat.</p>
+    <div class="rounded-xl bg-latar px-4 py-3 text-sm mb-4 flex flex-wrap items-center gap-3">
+      <span class="text-tinta-redup" data-i18n="pakar.sudut_aktif">Sudut pandang aktif:</span>
+      <span id="sudutAktif" class="font-medium" data-uji="sudut-aktif"></span>
+      <button type="button" id="hapusSudut" class="tombol-halus ml-auto" data-i18n="pakar.sudut_hapus" hidden>Hapus pilihan</button>
+    </div>
+    <label for="selPeluang" class="block text-sm font-medium mb-1.5" data-i18n="pakar.pilih_peluang">Pilih peluang, lalu salah satu kandidatnya</label>
+    <select id="selPeluang" class="medan mb-4"></select>
+    <div id="wadahKandidat"></div>
+  </section>
+
+  <section class="kartu p-6">
+    <h2 class="eyebrow text-tinta-redup mb-2" data-i18n="pakar.skenario_judul">Skenario terpandu</h2>
+    <p class="text-sm text-tinta-redup mb-4" data-i18n="pakar.skenario_ket">Urutan yang sama untuk semua panelis. Setiap layar menampilkan kodenya di pojok kanan atas.</p>
+    <ol id="skenario" class="space-y-3"></ol>
+  </section>
+</main>
+
+<script type="module">
+import { getJSON } from "/assets/js/jscroot/api.js";
+import { asal } from "/assets/js/config.js";
+import { requireLogin, requireRole, tokenHeader } from "/assets/js/auth.js";
+import { sehat, el, kosongkan, tabel, baris, kosong } from "/assets/js/ui.js";
+import { t } from "/assets/js/i18n.js";
+import { pasang } from "/assets/js/nav.js";
+import { bacaSudut, simpanSudut, hapusSudut } from "/assets/js/sudut.js";
+
+// Skenario tetap (§13.2): sama untuk semua panelis. `lewat` = layar yang
+// dibuka dari layar lain (butuh id), jadi tautannya menuju layar induknya.
+const SKENARIO = [
+    { kode: "H-08", url: "/taksonomi/" },
+    { kode: "H-03", url: "/peluang/" },
+    { kode: "H-01", url: "/pipeline/" },
+    { kode: "H-02", url: "/pipeline/", lewat: "H-01" },
+    { kode: "K-03", url: "/rekomendasi/", sudut: true },
+    { kode: "K-04", url: "/rekomendasi/", sudut: true, lewat: "K-03" },
+    { kode: "H-04", url: "/fairness/" },
+    { kode: "H-05", url: "/aturan/" },
+    { kode: "H-06", url: "/grafik-skill/" },
+    { kode: "H-07", url: "/kondisi-batas/" },
+    { kode: "A-01", url: "/audit-fairness/" },
+    { kode: "A-02", url: "/riwayat-tata-kelola/" },
+];
+
+if (requireLogin() && requireRole("P-01")) {
+    pasang("P-01");
+    const elPesan = document.getElementById("pesan");
+    const selPeluang = document.getElementById("selPeluang");
+    const wadahKandidat = document.getElementById("wadahKandidat");
+
+    function gambarSudut() {
+        const s = bacaSudut();
+        document.getElementById("sudutAktif").textContent = s ? s.nama + (s.unit ? " · " + s.unit : "") : t("pakar.sudut_belum");
+        document.getElementById("hapusSudut").hidden = !s;
+        gambarSkenario();
+    }
+
+    function gambarSkenario() {
+        const s = bacaSudut();
+        const ol = document.getElementById("skenario");
+        kosongkan(ol);
+        SKENARIO.forEach(function (l, i) {
+            const li = el("li", "flex gap-3");
+            li.appendChild(el("span", "kode-layar shrink-0 self-start", String(i + 1)));
+            const isi = el("div", "min-w-0 flex-1");
+            const kepala = el("div", "flex flex-wrap items-baseline gap-x-2");
+            kepala.appendChild(el("span", "font-data text-sm text-tinta-redup", l.kode));
+            kepala.appendChild(el("span", "font-medium", t("layar." + l.kode)));
+            isi.appendChild(kepala);
+            isi.appendChild(el("p", "text-sm text-tinta-redup mt-0.5", t("pakar.langkah." + l.kode)));
+            if (l.sudut && !s) {
+                isi.appendChild(el("p", "text-mikro text-tinjau mt-1", t("pakar.butuh_sudut")));
+            } else {
+                const a = el("a", "text-sm text-utama hover:underline", l.lewat ? t("pakar.buka_lewat", { kode: l.lewat }) : t("pakar.buka"));
+                a.href = l.url + (l.sudut ? "?karyawan_id=" + encodeURIComponent(s.id) : "");
+                a.dataset.kode = l.kode;
+                isi.appendChild(a);
+            }
+            li.appendChild(isi);
+            ol.appendChild(li);
+        });
+    }
+
+    document.getElementById("hapusSudut").addEventListener("click", function () { hapusSudut(); gambarSudut(); });
+
+    function muatKandidat(peluangId) {
+        kosongkan(wadahKandidat);
+        if (!peluangId) return;
+        getJSON(asal + "/api/peluang/" + encodeURIComponent(peluangId) + "/kandidat", function (hasil) {
+            if (!sehat(hasil, elPesan)) return;
+            const daftar = (hasil.data.data.kandidat || []);
+            const { wadah, tbody } = tabel([t("pakar.kolom_nama"), t("rekomendasi.kolom_unit"), t("pakar.kolom_jabatan"), ""]);
+            if (!daftar.length) tbody.appendChild(kosong(4, t("umum.tidak_ada_data")));
+            daftar.forEach(function (k) {
+                const btn = el("button", "tombol-halus", t("pakar.lihat_sebagai"));
+                btn.type = "button";
+                btn.addEventListener("click", function () { simpanSudut(k.karyawan); gambarSudut(); });
+                tbody.appendChild(baris([k.karyawan.nama, k.karyawan.unit, k.karyawan.jabatan, btn]));
+            });
+            wadahKandidat.appendChild(wadah);
+        }, ...tokenHeader());
+    }
+    selPeluang.addEventListener("change", function () { muatKandidat(selPeluang.value); });
+
+    getJSON(asal + "/api/peluang?status=terbuka&limit=200", function (hasil) {
+        if (!sehat(hasil, elPesan)) return;
+        const opt0 = document.createElement("option");
+        opt0.value = "";
+        opt0.textContent = t("pakar.pilih_peluang_kosong");
+        selPeluang.appendChild(opt0);
+        (hasil.data.data || []).forEach(function (p) {
+            const opt = document.createElement("option");
+            opt.value = p.id;
+            opt.textContent = p.judul + " · " + p.unit;
+            selPeluang.appendChild(opt);
+        });
+    }, ...tokenHeader());
+
+    gambarSudut();
+}
+</script>
+</body>
+</html>

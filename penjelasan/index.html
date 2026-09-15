@@ -14,7 +14,7 @@
 
 <main class="mx-auto max-w-3xl px-5 py-6 space-y-5">
   <div id="pesan" hidden role="alert"></div>
-  <a href="javascript:history.back()" class="text-sm text-tinta-redup hover:underline" data-i18n="umum.kembali">Kembali</a>
+  <button type="button" id="kembali" class="text-sm text-tinta-redup hover:underline" data-i18n="umum.kembali">Kembali</button>
 
   <section class="kartu p-6">
     <div class="flex items-start justify-between gap-3 mb-1">
@@ -24,6 +24,13 @@
     <p id="subPeluang" class="text-sm text-tinta-redup mb-5"></p>
     <div id="wadahKontribusi"></div>
     <div id="wadahAksi" class="flex flex-wrap gap-2 mt-6"></div>
+  </section>
+
+  <section id="bagianKondisi" class="kartu p-6" hidden>
+    <h2 class="eyebrow text-tinta-redup mb-2" data-i18n="penjelasan.kondisi_judul">Kondisi batas yang berlaku</h2>
+    <p class="text-sm text-tinta-redup mb-4" data-i18n="penjelasan.kondisi_ket">Rekomendasi ini hanya sah dipakai bila syarat berikut terpenuhi.</p>
+    <p id="ketVersiKondisi" class="text-mikro text-tinjau mb-3" hidden></p>
+    <div id="wadahKondisi" class="space-y-4"></div>
   </section>
 </main>
 
@@ -53,6 +60,7 @@ if (requireLogin() && requireRole("K-04")) {
     const elPesan = document.getElementById("pesan");
     const id = getQueryString().id;
     const peran = getUser().role;
+    document.getElementById("kembali").addEventListener("click", function () { history.back(); });
 
     if (!id) {
         pesan(elPesan, t("penjelasan.tanpa_id"), "galat");
@@ -83,6 +91,7 @@ if (requireLogin() && requireRole("K-04")) {
         elStatus.appendChild(lencana(t("status.match." + d.match.status), jenisMatch(d.match.status)));
 
         renderKontribusi(document.getElementById("wadahKontribusi"), d.match, d.skill);
+        muatKondisi(d.match.kondisi_batas_id);
 
         const wadahAksi = document.getElementById("wadahAksi");
         kosongkan(wadahAksi);
@@ -94,6 +103,45 @@ if (requireLogin() && requireRole("K-04")) {
             btn.addEventListener("click", function () { ubahStatus(ke); });
             wadahAksi.appendChild(btn);
         });
+    }
+
+    // §7.2: penjelasan menyebut kondisi batas yang berlaku. Karyawan hanya
+    // boleh membaca versi aktif; pakar membaca seluruh versi sehingga versi
+    // yang dibekukan match bisa ditemukan persis. Manajer tidak punya akses
+    // baca kondisi batas di backend, jadi bagian ini tidak tampil untuknya.
+    function muatKondisi(idKondisi) {
+        if (peran !== PERAN.KARYAWAN && peran !== PERAN.PAKAR) return;
+        getJSON(asal + "/api/kondisi-batas" + (peran === PERAN.PAKAR ? "?limit=200" : ""), function (hasil) {
+            // 404 kondisi_batas_tidak_aktif bukan galat halaman: siklus boleh
+            // dijalankan tanpa kondisi batas.
+            if (hasil && hasil.status === 404) return;
+            if (!sehat(hasil, elPesan)) return;
+            const data = hasil.data.data;
+            let versi = Array.isArray(data) ? data.find(function (k) { return k.id === idKondisi; }) : data;
+            const ket = document.getElementById("ketVersiKondisi");
+            if (!Array.isArray(data) && idKondisi && data.id !== idKondisi) {
+                ket.textContent = t("penjelasan.kondisi_beda_versi", { versi: data.versi });
+                ket.hidden = false;
+            }
+            if (!versi) return;
+            const wadah = document.getElementById("wadahKondisi");
+            kosongkan(wadah);
+            ["D1", "D2", "D3", "D4"].forEach(function (dim) {
+                const baris = (versi.pernyataan || []).filter(function (p) { return p.dimensi === dim; });
+                if (!baris.length) return;
+                const blok = el("div", "");
+                blok.appendChild(el("div", "text-sm font-medium mb-1", t("dimensiKondisi." + dim)));
+                baris.forEach(function (p) {
+                    const r = el("p", "text-sm text-tinta-redup flex gap-2");
+                    r.appendChild(el("span", "font-data text-mikro uppercase shrink-0 mt-0.5", p.bahasa));
+                    r.appendChild(el("span", "", p.teks));
+                    blok.appendChild(r);
+                });
+                wadah.appendChild(blok);
+            });
+            wadah.appendChild(el("p", "text-mikro text-tinta-redup font-data", t("penjelasan.kondisi_versi", { versi: versi.versi })));
+            document.getElementById("bagianKondisi").hidden = false;
+        }, ...tokenHeader());
     }
 
     function ubahStatus(ke) {

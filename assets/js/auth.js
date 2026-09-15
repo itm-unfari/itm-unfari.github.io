@@ -33,6 +33,8 @@ export function clear() {
     try {
         localStorage.removeItem(KUNCI_TOKEN);
         localStorage.removeItem(KUNCI_USER);
+        // Sudut pandang pakar (sudut.js) milik sesi, bukan milik peramban.
+        localStorage.removeItem("itm_sudut_pandang");
     } catch (e) { /* diabaikan */ }
 }
 

@@ -1,0 +1,226 @@
+<!DOCTYPE html>
+<html lang="id" data-judul="pengguna.judul_halaman">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Internal Talent Marketplace</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=Plus+Jakarta+Sans:wght@400..700&display=swap" rel="stylesheet">
+  <script src="/assets/js/prapasang.js"></script>
+  <link rel="stylesheet" href="/assets/css/app.css">
+</head>
+<body>
+
+<main class="mx-auto max-w-5xl px-5 py-6 space-y-5">
+  <div id="pesan" hidden role="alert"></div>
+
+  <section class="kartu p-6">
+    <div class="flex flex-wrap items-center justify-between gap-3 mb-4">
+      <h2 class="eyebrow text-tinta-redup" data-i18n="pengguna.daftar">Daftar akun</h2>
+      <form id="formCari" class="flex gap-2" role="search">
+        <label for="cari" class="sr-only" data-i18n="umum.cari">Cari…</label>
+        <input id="cari" type="search" class="medan w-56" data-i18n-placeholder="pengguna.cari">
+        <button type="submit" class="tombol-halus" data-i18n="umum.filter">Saring</button>
+      </form>
+    </div>
+    <div id="wadahTabel"></div>
+    <div class="flex items-center justify-between gap-3 mt-4 text-sm">
+      <button type="button" id="sebelumnya" class="tombol-halus" data-i18n="umum.sebelumnya">Sebelumnya</button>
+      <span id="infoHalaman" class="text-tinta-redup"></span>
+      <button type="button" id="berikutnya" class="tombol-halus" data-i18n="umum.berikutnya">Berikutnya</button>
+    </div>
+  </section>
+
+  <section class="kartu p-6">
+    <div class="flex items-center justify-between gap-3 mb-2">
+      <h2 id="judulForm" class="eyebrow text-tinta-redup"></h2>
+      <button type="button" id="batalUbah" class="tombol-halus" hidden data-i18n="umum.batal">Batal</button>
+    </div>
+    <p id="ketForm" class="text-sm text-tinta-redup mb-4"></p>
+    <div id="pesanForm" hidden role="alert"></div>
+    <form id="formAkun" class="grid gap-4 sm:grid-cols-2" novalidate>
+      <div>
+        <label for="uname" class="block text-sm font-medium mb-1.5" data-i18n="akun.nama_pengguna">Nama pengguna</label>
+        <input id="uname" class="medan font-data" autocomplete="off" spellcheck="false" required>
+      </div>
+      <div>
+        <label for="nama" class="block text-sm font-medium mb-1.5" data-i18n="pengguna.nama">Nama</label>
+        <input id="nama" class="medan" autocomplete="off" required>
+      </div>
+      <div>
+        <label for="peran" class="block text-sm font-medium mb-1.5" data-i18n="akun.peran">Peran</label>
+        <select id="peran" class="medan"></select>
+      </div>
+      <div>
+        <label for="refId" class="block text-sm font-medium mb-1.5" data-i18n="pengguna.ref_id">ID karyawan acuan</label>
+        <input id="refId" class="medan font-data" autocomplete="off" spellcheck="false">
+        <p id="ketRef" class="text-mikro text-tinta-redup mt-1"></p>
+      </div>
+      <div>
+        <label for="sandi" class="block text-sm font-medium mb-1.5" id="labelSandi"></label>
+        <input id="sandi" type="password" class="medan" autocomplete="new-password" minlength="8">
+      </div>
+      <div class="flex items-end">
+        <label id="wadahAktif" class="flex items-center gap-2 text-sm" hidden>
+          <input id="aktif" type="checkbox" class="h-4 w-4">
+          <span data-i18n="umum.aktif">Aktif</span>
+        </label>
+      </div>
+      <div class="sm:col-span-2">
+        <button type="submit" id="tombolSimpan" class="tombol-utama" data-i18n="umum.simpan">Simpan</button>
+      </div>
+    </form>
+  </section>
+</main>
+
+<script type="module">
+import { getJSON, postJSON } from "/assets/js/jscroot/api.js";
+import { asal, PERAN, SEMUA_PERAN } from "/assets/js/config.js";
+import { requireLogin, requireRole, tokenHeader, getUser } from "/assets/js/auth.js";
+import { pesan, sembunyikan, sehat, el, kosongkan, lencana, tabel, baris, kosong } from "/assets/js/ui.js";
+import { t } from "/assets/js/i18n.js";
+import { pasang } from "/assets/js/nav.js";
+
+if (requireLogin() && requireRole("S-01")) {
+    pasang("S-01");
+    const elPesan = document.getElementById("pesan");
+    const elPesanForm = document.getElementById("pesanForm");
+    const wadahTabel = document.getElementById("wadahTabel");
+    const form = document.getElementById("formAkun");
+    const f = {
+        uname: document.getElementById("uname"), nama: document.getElementById("nama"),
+        peran: document.getElementById("peran"), refId: document.getElementById("refId"),
+        sandi: document.getElementById("sandi"), aktif: document.getElementById("aktif"),
+    };
+    const PERAN_BER_REF = [PERAN.KARYAWAN, PERAN.MANAJER];
+    let halaman = 1, totalHalaman = 1, kataCari = "", sedangDiubah = null;
+
+    SEMUA_PERAN.forEach(function (r) {
+        const opt = document.createElement("option");
+        opt.value = String(r);
+        opt.textContent = t("peran." + r);
+        f.peran.appendChild(opt);
+    });
+
+    function aturRef() {
+        const berRef = PERAN_BER_REF.includes(Number(f.peran.value));
+        f.refId.disabled = !berRef;
+        if (!berRef) f.refId.value = "";
+        document.getElementById("ketRef").textContent = t(berRef ? "pengguna.ref_ket" : "pengguna.ref_tidak_berlaku");
+    }
+    f.peran.addEventListener("change", aturRef);
+
+    function modeBuat() {
+        sedangDiubah = null;
+        form.reset();
+        f.peran.value = String(PERAN.KARYAWAN);
+        aturRef();
+        document.getElementById("judulForm").textContent = t("pengguna.buat_judul");
+        document.getElementById("ketForm").textContent = t("pengguna.buat_ket");
+        document.getElementById("labelSandi").textContent = t("pengguna.sandi_awal");
+        f.sandi.required = true;
+        document.getElementById("wadahAktif").hidden = true;
+        document.getElementById("batalUbah").hidden = true;
+        sembunyikan(elPesanForm);
+    }
+
+    function modeUbah(u) {
+        sedangDiubah = u;
+        f.uname.value = u.uname;
+        f.nama.value = u.name;
+        f.peran.value = String(u.role);
+        aturRef();
+        f.refId.value = u.ref_id || "";
+        f.sandi.value = "";
+        f.sandi.required = false;
+        f.aktif.checked = !!u.active;
+        document.getElementById("judulForm").textContent = t("pengguna.ubah_judul", { uname: u.uname });
+        document.getElementById("ketForm").textContent = t("pengguna.ubah_ket");
+        document.getElementById("labelSandi").textContent = t("pengguna.sandi_reset");
+        document.getElementById("wadahAktif").hidden = false;
+        document.getElementById("batalUbah").hidden = false;
+        sembunyikan(elPesanForm);
+        form.scrollIntoView({ behavior: "smooth", block: "start" });
+    }
+    document.getElementById("batalUbah").addEventListener("click", modeBuat);
+
+    function muat() {
+        const q = new URLSearchParams({ page: String(halaman), limit: "20" });
+        if (kataCari) q.set("q", kataCari);
+        getJSON(asal + "/api/pengguna?" + q.toString(), function (hasil) {
+            if (!sehat(hasil, elPesan)) return;
+            const daftar = hasil.data.data || [];
+            const meta = hasil.data.meta || {};
+            totalHalaman = meta.total_pages || 1;
+            document.getElementById("infoHalaman").textContent = t("umum.halaman", { n: meta.page || halaman, total: totalHalaman });
+            document.getElementById("sebelumnya").disabled = halaman <= 1;
+            document.getElementById("berikutnya").disabled = halaman >= totalHalaman;
+            kosongkan(wadahTabel);
+            const { wadah, tbody } = tabel([t("akun.nama_pengguna"), t("pengguna.nama"), t("akun.peran"), t("pengguna.ref_id"), t("pengguna.status"), ""]);
+            if (!daftar.length) tbody.appendChild(kosong(6, t("umum.tidak_ada_data")));
+            daftar.forEach(function (u) {
+                const btn = el("button", "tombol-halus", t("pengguna.ubah"));
+                btn.type = "button";
+                btn.addEventListener("click", function () { modeUbah(u); });
+                tbody.appendChild(baris([
+                    el("span", "font-data", u.uname), u.name, t("peran." + u.role),
+                    el("span", "font-data text-tinta-redup", u.ref_id || "—"),
+                    lencana(t(u.active ? "umum.aktif" : "umum.nonaktif"), u.active ? "sah" : "netral"),
+                    btn,
+                ]));
+            });
+            wadahTabel.appendChild(wadah);
+        }, ...tokenHeader());
+    }
+
+    document.getElementById("sebelumnya").addEventListener("click", function () { if (halaman > 1) { halaman--; muat(); } });
+    document.getElementById("berikutnya").addEventListener("click", function () { if (halaman < totalHalaman) { halaman++; muat(); } });
+    document.getElementById("formCari").addEventListener("submit", function (e) {
+        e.preventDefault();
+        kataCari = document.getElementById("cari").value.trim();
+        halaman = 1;
+        muat();
+    });
+
+    form.addEventListener("submit", function (e) {
+        e.preventDefault();
+        sembunyikan(elPesanForm);
+        const sandi = f.sandi.value;
+        if ((!sedangDiubah || sandi) && sandi.length < 8) {
+            pesan(elPesanForm, t("galat.sandi_terlalu_pendek"), "galat");
+            return;
+        }
+        const peran = Number(f.peran.value);
+        const badan = { uname: f.uname.value.trim(), name: f.nama.value.trim(), role: peran, ref_id: f.refId.value.trim() };
+        if (sandi) badan.password = sandi;
+        let url = asal + "/api/pengguna";
+        if (sedangDiubah) {
+            url += "/" + encodeURIComponent(sedangDiubah.id);
+            badan.active = f.aktif.checked;
+            if (sedangDiubah.id === getUser().id && !badan.active) {
+                pesan(elPesanForm, t("pengguna.tidak_bisa_nonaktif_sendiri"), "galat");
+                return;
+            }
+        } else if (!badan.uname || !badan.name) {
+            pesan(elPesanForm, t("pengguna.wajib_diisi"), "galat");
+            return;
+        }
+        const tombol = document.getElementById("tombolSimpan");
+        tombol.disabled = true;
+        postJSON(url, badan, function (hasil) {
+            tombol.disabled = false;
+            if (!sehat(hasil, elPesanForm)) return;
+            const diubah = !!sedangDiubah;
+            modeBuat();
+            pesan(elPesanForm, t(diubah ? "pengguna.berhasil_ubah" : "pengguna.berhasil_buat"), "sah");
+            muat();
+        }, ...tokenHeader());
+    });
+
+    modeBuat();
+    muat();
+}
+</script>
+</body>
+</html>

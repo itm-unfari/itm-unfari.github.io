@@ -34,11 +34,11 @@ export const LAYAR = [
     { kode: "A-02", url: "/riwayat-tata-kelola/", peran: [P.AUDITOR], tersedia: false },
     { kode: "A-03", url: "/log-audit/", peran: [P.AUDITOR, P.HR], tersedia: false },
 
-    { kode: "S-01", url: "/pengguna/", peran: [P.ADMIN], tersedia: false },
-    { kode: "S-02", url: "/pengaturan/", peran: [P.ADMIN], tersedia: false },
+    { kode: "S-01", url: "/pengguna/", peran: [P.ADMIN], tersedia: true },
+    { kode: "S-02", url: "/pengaturan/", peran: [P.ADMIN], tersedia: true },
 
-    { kode: "P-01", url: "/pakar/", peran: [P.PAKAR], tersedia: false },
-    { kode: "P-02", url: "/kode-layar/", peran: [P.PAKAR], tersedia: false },
+    { kode: "P-01", url: "/pakar/", peran: [P.PAKAR], tersedia: true },
+    { kode: "P-02", url: "/kode-layar/", peran: [P.PAKAR], tersedia: true },
 ];
 
 export function cariLayar(kode) {
@@ -46,6 +46,12 @@ export function cariLayar(kode) {
 }
 
 // layarUntuk mengembalikan layar yang ditautkan di nav untuk satu peran.
+// Pakar boleh MEMBUKA banyak layar peran lain (hanya-baca), tapi berkeliling
+// lewat skenario terpandu P-01 dan daftar P-02 (§13.2), jadi nav-nya tidak
+// memuat belasan tautan.
 export function layarUntuk(peran) {
-    return LAYAR.filter(function (l) { return l.tersedia && !l.tanpaNav && l.peran.includes(peran); });
+    return LAYAR.filter(function (l) {
+        if (!l.tersedia || l.tanpaNav || !l.peran.includes(peran)) return false;
+        return peran !== P.PAKAR || l.kode === "U-02" || l.kode.startsWith("P-");
+    });
 }

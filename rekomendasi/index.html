@@ -29,13 +29,15 @@ import { sehat, el, kosongkan, lencana, tabel, baris, kosong } from "/assets/js/
 import { t } from "/assets/js/i18n.js";
 import { pasang } from "/assets/js/nav.js";
 import { batangKontribusi, fmt } from "/assets/js/kontribusi.js";
+import { bacaSudut } from "/assets/js/sudut.js";
 
 if (requireLogin() && requireRole("K-03")) {
     pasang("K-03");
     const elPesan = document.getElementById("pesan");
     const wadahTabel = document.getElementById("wadahTabel");
     // Pakar melihat lewat sudut pandang satu karyawan (§13.2, P-01).
-    const sudut = getUser().role === PERAN.PAKAR ? (getQueryString().karyawan_id || "") : "";
+    const pakar = getUser().role === PERAN.PAKAR;
+    const sudut = pakar ? (getQueryString().karyawan_id || (bacaSudut() || {}).id || "") : "";
 
     function jenisMatch(status) {
         if (status === "diterima" || status === "berminat") return "sah";
@@ -43,7 +45,14 @@ if (requireLogin() && requireRole("K-03")) {
         return "netral";
     }
 
-    getJSON(asal + "/api/skill", function (hasilSkill) {
+    if (pakar && !sudut) {
+        const p = el("p", "text-sm text-tinta-redup");
+        p.appendChild(document.createTextNode(t("pakar.butuh_sudut") + " "));
+        const a = el("a", "text-utama hover:underline", t("layar.P-01"));
+        a.href = "/pakar/";
+        p.appendChild(a);
+        wadahTabel.appendChild(p);
+    } else getJSON(asal + "/api/skill", function (hasilSkill) {
         if (!sehat(hasilSkill, elPesan)) return;
         const skillMap = {};
         (hasilSkill.data.data.skill || []).forEach(function (s) { skillMap[s.kode] = s; });

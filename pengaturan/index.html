@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="id" data-judul="pengaturan.judul_halaman">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Internal Talent Marketplace</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=Plus+Jakarta+Sans:wght@400..700&display=swap" rel="stylesheet">
+  <script src="/assets/js/prapasang.js"></script>
+  <link rel="stylesheet" href="/assets/css/app.css">
+</head>
+<body>
+
+<main class="mx-auto max-w-3xl px-5 py-6 space-y-5">
+  <div id="pesan" hidden role="alert"></div>
+
+  <form id="formPengaturan" class="space-y-5" novalidate>
+    <section class="kartu p-6">
+      <h2 class="eyebrow text-tinta-redup mb-3" data-i18n="pengaturan.kelompok_judul">Ambang kelompok minimum</h2>
+      <p class="text-sm text-tinta-redup mb-4" data-i18n="pengaturan.kelompok_ket">Agregat fairness untuk kelompok yang lebih kecil dari angka ini disembunyikan.</p>
+      <label for="ambangKelompok" class="block text-sm font-medium mb-1.5" data-i18n="pengaturan.kelompok_label">Jumlah orang minimum per kelompok</label>
+      <input id="ambangKelompok" type="number" min="10" step="1" class="medan font-data max-w-[10rem]" required>
+      <p class="text-mikro text-tinta-redup mt-2" data-i18n="pengaturan.kelompok_lantai">Lantai di kode adalah 10: angka ini hanya bisa dinaikkan.</p>
+    </section>
+
+    <section class="kartu p-6">
+      <h2 class="eyebrow text-tinta-redup mb-3" data-i18n="pengaturan.penanda_judul">Ambang penanda fairness</h2>
+      <p class="text-sm text-tinta-redup mb-4" data-i18n="pengaturan.penanda_ket">Rasio tingkat rekomendasi sebuah kelompok terhadap kelompok tertinggi di bawah angka ini ditandai "perlu ditinjau".</p>
+      <label for="ambangPenanda" class="block text-sm font-medium mb-1.5" data-i18n="pengaturan.penanda_label">Rasio (lebih dari 0, paling banyak 1)</label>
+      <input id="ambangPenanda" type="number" min="0.01" max="1" step="0.01" class="medan font-data max-w-[10rem]" required>
+      <p class="text-mikro text-tinta-redup mt-2" data-i18n="pengaturan.penanda_acuan">Bawaan 0,8 mengikuti aturan empat-per-lima.</p>
+    </section>
+
+    <section class="kartu p-6">
+      <h2 class="eyebrow text-tinta-redup mb-3" data-i18n="pengaturan.kemiripan_judul">Ambang kemiripan tepi grafik skill</h2>
+      <p class="text-sm text-tinta-redup mb-4" data-i18n="pengaturan.kemiripan_ket">Pasangan skill dengan kemiripan embedding di atas angka ini diusulkan sebagai tepi.</p>
+      <label for="ambangKemiripan" class="block text-sm font-medium mb-1.5" data-i18n="pengaturan.kemiripan_label">Kemiripan kosinus (lebih dari 0, paling banyak 1)</label>
+      <input id="ambangKemiripan" type="number" min="0.01" max="1" step="0.01" class="medan font-data max-w-[10rem]" required>
+      <p class="text-mikro text-tinta-redup mt-2" data-i18n="pengaturan.kemiripan_acuan">Bawaan 0,75 adalah titik awal tanpa acuan eksternal.</p>
+    </section>
+
+    <div class="flex flex-wrap items-center gap-3">
+      <button type="submit" id="tombolSimpan" class="tombol-utama" data-i18n="umum.simpan">Simpan</button>
+      <span class="text-mikro text-tinta-redup" data-i18n="pengaturan.tercatat">Setiap perubahan tercatat di log audit.</span>
+    </div>
+  </form>
+</main>
+
+<script type="module">
+import { getJSON, postJSON } from "/assets/js/jscroot/api.js";
+import { asal } from "/assets/js/config.js";
+import { requireLogin, requireRole, tokenHeader } from "/assets/js/auth.js";
+import { pesan, sembunyikan, sehat } from "/assets/js/ui.js";
+import { t } from "/assets/js/i18n.js";
+import { pasang } from "/assets/js/nav.js";
+
+if (requireLogin() && requireRole("S-02")) {
+    pasang("S-02");
+    const elPesan = document.getElementById("pesan");
+    const form = document.getElementById("formPengaturan");
+    const kelompok = document.getElementById("ambangKelompok");
+    const penanda = document.getElementById("ambangPenanda");
+    const kemiripan = document.getElementById("ambangKemiripan");
+    const tombol = document.getElementById("tombolSimpan");
+
+    function isi(p) {
+        kelompok.value = String(p.ambang_kelompok);
+        penanda.value = String(p.ambang_penanda);
+        kemiripan.value = String(p.ambang_kemiripan);
+    }
+
+    getJSON(asal + "/api/pengaturan", function (hasil) {
+        if (!sehat(hasil, elPesan)) return;
+        isi(hasil.data.data);
+    }, ...tokenHeader());
+
+    form.addEventListener("submit", function (e) {
+        e.preventDefault();
+        sembunyikan(elPesan);
+        const badan = {
+            ambang_kelompok: Number(kelompok.value),
+            ambang_penanda: Number(penanda.value),
+            ambang_kemiripan: Number(kemiripan.value),
+        };
+        if (!Number.isInteger(badan.ambang_kelompok)) {
+            pesan(elPesan, t("galat.ambang_tidak_sah"), "galat");
+            return;
+        }
+        tombol.disabled = true;
+        postJSON(asal + "/api/pengaturan", badan, function (hasil) {
+            tombol.disabled = false;
+            if (!sehat(hasil, elPesan)) return;
+            isi(hasil.data.data);
+            pesan(elPesan, t("pengaturan.berhasil"), "sah");
+        }, ...tokenHeader());
+    });
+}
+</script>
+</body>
+</html>

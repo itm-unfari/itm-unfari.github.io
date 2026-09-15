@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html lang="id" data-judul="kodeLayar.judul_halaman">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Internal Talent Marketplace</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=Plus+Jakarta+Sans:wght@400..700&display=swap" rel="stylesheet">
+  <script src="/assets/js/prapasang.js"></script>
+  <link rel="stylesheet" href="/assets/css/app.css">
+</head>
+<body>
+
+<main class="mx-auto max-w-4xl px-5 py-6 space-y-5">
+  <div id="pesan" hidden role="alert"></div>
+  <section class="kartu p-6">
+    <h2 class="eyebrow text-tinta-redup mb-2" data-i18n="kodeLayar.daftar">Daftar kode layar</h2>
+    <p class="text-sm text-tinta-redup mb-4" data-i18n="kodeLayar.ket">Kode ini dirujuk butir instrumen Delphi dan tidak berubah setelah pengembangan selesai.</p>
+    <div id="wadahTabel"></div>
+  </section>
+</main>
+
+<script type="module">
+import { PERAN } from "/assets/js/config.js";
+import { requireLogin, requireRole } from "/assets/js/auth.js";
+import { el, lencana, tabel, baris } from "/assets/js/ui.js";
+import { t } from "/assets/js/i18n.js";
+import { pasang } from "/assets/js/nav.js";
+import { LAYAR } from "/assets/js/layar.js";
+
+// Dibangkitkan dari layar.js (§12 rencana: "daftar kode layar dibangkitkan
+// dari modul itu"), bukan ditulis ulang di sini.
+if (requireLogin() && requireRole("P-02")) {
+    pasang("P-02");
+    const { wadah, tbody } = tabel([t("umum.kode_layar"), t("kodeLayar.kolom_layar"), t("kodeLayar.kolom_peran"), t("kodeLayar.kolom_status")]);
+    LAYAR.forEach(function (l) {
+        const kode = el("span", "kode-layar", l.kode);
+        const nama = el("div", "");
+        if (l.tersedia && !l.tanpaNav && l.peran.includes(PERAN.PAKAR)) {
+            const a = el("a", "text-utama hover:underline", t("layar." + l.kode));
+            a.href = l.url;
+            nama.appendChild(a);
+        } else {
+            nama.appendChild(el("span", "", t("layar." + l.kode)));
+        }
+        if (l.tanpaNav) nama.appendChild(el("div", "text-mikro text-tinta-redup", t("kodeLayar.dibuka_dari_layar_lain")));
+        const status = !l.tersedia ? lencana(t("kodeLayar.belum_tersedia"), "netral")
+            : l.peran.includes(PERAN.PAKAR) ? lencana(t("kodeLayar.bisa_dilihat"), "sah")
+            : lencana(t("kodeLayar.di_luar_mode_pakar"), "netral");
+        const tr = baris([kode, nama, l.peran.map(function (r) { return t("peran." + r); }).join(", "), status]);
+        tr.dataset.kode = l.kode;
+        tbody.appendChild(tr);
+    });
+    document.getElementById("wadahTabel").appendChild(wadah);
+}
+</script>
+</body>
+</html>

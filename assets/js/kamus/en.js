@@ -97,6 +97,10 @@ export default {
     "kontribusi.dari_100": "out of 100",
     "kontribusi.kosong": "This opportunity has no required skills yet.",
     "kontribusi.kalimat": "{skill}: requires level {butuh}, level held {milik} — contributing {sumbangan} of {bobot} points.",
+    "kontribusi.kalimat_via": "{skill}: not held directly, counted through proximity to {via} — contributing {sumbangan} of {bobot} points.",
+    "kontribusi.kalimat_kurang": "{skill}: requires level {butuh}, not yet held — a development opportunity worth {bobot} points.",
+    "kontribusi.aria": "Contribution bar, score {skor} out of 100",
+    "kontribusi.keterangan": "Hatched segments: skill counted through proximity. Dashed space: gap up to 100.",
 
     "peran.1": "System admin",
     "peran.2": "HR/Talent",

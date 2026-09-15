@@ -99,6 +99,10 @@ export default {
     "kontribusi.dari_100": "dari 100",
     "kontribusi.kosong": "Peluang ini belum punya skill yang dibutuhkan.",
     "kontribusi.kalimat": "{skill}: dibutuhkan tingkat {butuh}, tingkat dimiliki {milik} — menyumbang {sumbangan} dari {bobot} poin.",
+    "kontribusi.kalimat_via": "{skill}: tidak dimiliki langsung, diperhitungkan lewat kedekatan dengan {via} — menyumbang {sumbangan} dari {bobot} poin.",
+    "kontribusi.kalimat_kurang": "{skill}: dibutuhkan tingkat {butuh}, belum dimiliki — peluang pengembangan senilai {bobot} poin.",
+    "kontribusi.aria": "Batang kontribusi, skor {skor} dari 100",
+    "kontribusi.keterangan": "Segmen bergaris miring: skill diperhitungkan lewat kedekatan. Ruang bergaris putus: gap sampai 100.",
 
     "peran.1": "Admin sistem",
     "peran.2": "HR/Talent",

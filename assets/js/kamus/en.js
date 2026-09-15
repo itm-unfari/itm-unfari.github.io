@@ -112,4 +112,8 @@ export default {
     "galat.metrik_butuh_label": "This metric needs ground-truth labels that are not yet available for any cycle.",
     "galat.ambang_terlalu_rendah": "The group threshold cannot be lowered below the minimum floor.",
     "galat.ambang_tidak_sah": "Invalid threshold value.",
+    "galat.keputusan_tidak_sah": "The decision must be accept, reject, or change.",
+    "galat.butir_sudah_diputuskan": "This proposal item has already been decided.",
+    "galat.bahasa_tidak_sah": "Language must be Indonesian or English.",
+    "galat.riwayat_kosong": "No mobility history is available to train on yet.",
 };

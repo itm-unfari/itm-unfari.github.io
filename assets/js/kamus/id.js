@@ -114,4 +114,8 @@ export default {
     "galat.metrik_butuh_label": "Metrik ini butuh label kebenaran yang belum tersedia untuk siklus manapun.",
     "galat.ambang_terlalu_rendah": "Ambang kelompok tidak boleh diturunkan di bawah batas minimum.",
     "galat.ambang_tidak_sah": "Nilai ambang tidak sah.",
+    "galat.keputusan_tidak_sah": "Keputusan harus diterima, ditolak, atau diubah.",
+    "galat.butir_sudah_diputuskan": "Butir usulan ini sudah pernah diputuskan.",
+    "galat.bahasa_tidak_sah": "Bahasa harus Indonesia atau Inggris.",
+    "galat.riwayat_kosong": "Belum ada riwayat mobilitas untuk dilatih.",
 };

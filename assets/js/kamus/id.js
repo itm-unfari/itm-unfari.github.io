@@ -120,4 +120,6 @@ export default {
     "galat.riwayat_kosong": "Belum ada riwayat mobilitas untuk dilatih.",
     "galat.kondisi_batas_tidak_sah": "Kondisi batas tidak sah: keempat dimensi (D1-D4) wajib diisi.",
     "galat.kondisi_batas_tidak_aktif": "Belum ada kondisi batas yang aktif.",
+    "galat.pengguna_tidak_sah": "Data pengguna tidak sah.",
+    "galat.pengguna_sudah_ada": "Nama pengguna itu sudah dipakai.",
 };

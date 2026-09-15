@@ -118,4 +118,6 @@ export default {
     "galat.riwayat_kosong": "No mobility history is available to train on yet.",
     "galat.kondisi_batas_tidak_sah": "Invalid boundary conditions: all four dimensions (D1-D4) are required.",
     "galat.kondisi_batas_tidak_aktif": "No active boundary conditions are set.",
+    "galat.pengguna_tidak_sah": "Invalid user data.",
+    "galat.pengguna_sudah_ada": "That username is already taken.",
 };

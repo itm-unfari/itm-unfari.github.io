@@ -675,6 +675,17 @@ export default {
     "taksonomi.impor_berhasil": "Version {versi} imported.",
     "taksonomi.impor_berhasil_aktif": "Version {versi} imported and now active.",
 
+    "aturan.bandingkan_dimensi": "Attribute",
+    "aturan.bandingkan_manual": "Manual rule (latest cycle)",
+    "aturan.bandingkan_berjalan": "Active rule (latest cycle)",
+    "aturan.bandingkan_dipelajari": "Learned",
+    "aturan.bandingkan_mitigasi": "Learned with mitigation",
+    "aturan.bandingkan_ket_siklus": "Version {versi} · {nama}",
+    "aturan.bandingkan_ket_versi": "Version {versi} · shadow cycle",
+    "aturan.bandingkan_belum_ada": "No version for this column yet.",
+    "aturan.bandingkan_catatan": "Shadow cycles match every opportunity open at training time, while the first column uses the latest real cycle's opportunities; compare the pattern, not the exact numbers.",
+    "aturan.lencana_mitigasi": "With mitigation",
+
     "halaman.tidak_ditemukan": "Page not found.",
     "halaman.ke_awal": "Back to start",
 

@@ -677,6 +677,17 @@ export default {
     "taksonomi.impor_berhasil": "Versi {versi} berhasil diimpor.",
     "taksonomi.impor_berhasil_aktif": "Versi {versi} berhasil diimpor dan kini aktif.",
 
+    "aturan.bandingkan_dimensi": "Atribut",
+    "aturan.bandingkan_manual": "Aturan manual (siklus terbaru)",
+    "aturan.bandingkan_berjalan": "Aturan aktif (siklus terbaru)",
+    "aturan.bandingkan_dipelajari": "Hasil belajar",
+    "aturan.bandingkan_mitigasi": "Hasil belajar dengan mitigasi",
+    "aturan.bandingkan_ket_siklus": "Versi {versi} · {nama}",
+    "aturan.bandingkan_ket_versi": "Versi {versi} · siklus bayangan",
+    "aturan.bandingkan_belum_ada": "Belum ada versi untuk kolom ini.",
+    "aturan.bandingkan_catatan": "Siklus bayangan mencocokkan seluruh peluang yang terbuka saat pelatihan, sedangkan kolom pertama memakai peluang siklus sungguhan terbaru; bandingkan polanya, bukan angka persisnya.",
+    "aturan.lencana_mitigasi": "Dengan mitigasi",
+
     "halaman.tidak_ditemukan": "Halaman tidak ditemukan.",
     "halaman.ke_awal": "Kembali ke awal",
 

@@ -93,6 +93,7 @@ import { pesan, sembunyikan, sehat, el, kosongkan, lencana, tabel, baris, kosong
 import { t, bahasa } from "/assets/js/i18n.js";
 import { pasang } from "/assets/js/nav.js";
 import { namaSkill, fmt } from "/assets/js/kontribusi.js";
+import { DIMENSI, plotRasio, urlAudit, muatSiklusDijalankan, siklusBawaan } from "/assets/js/fairness.js";
 
 const PER_HALAMAN = 20;
 const BATAS_TUNGGU = 40;
@@ -375,9 +376,88 @@ if (requireLogin() && requireRole("H-05")) {
 
     // ── perbandingan: tautan siklus bayangan ──
 
+    // §13.5: plot rasio yang sama berdampingan untuk aturan manual, hasil
+    // belajar, dan hasil belajar dengan mitigasi. Kolom manual memakai siklus
+    // sungguhan terbaru; dua kolom lain memakai siklus bayangan versi
+    // dipelajari terbaru masing-masing (daftar aturan urut versi turun).
+    const elPerbandingan = document.getElementById("wadahPerbandingan");
+    let pilihanPerbandingan = null;
+    let dimensiPerbandingan = "jenis_kelamin";
+
+    function gambarPerbandingan() {
+        if (!pilihanPerbandingan) return;
+        kosongkan(elPerbandingan);
+        const kepala = el("div", "flex flex-wrap items-center gap-3 mb-4");
+        const label = el("label", "text-sm font-medium", t("aturan.bandingkan_dimensi"));
+        label.htmlFor = "dimensiPerbandingan";
+        const sel = el("select", "medan w-auto");
+        sel.id = "dimensiPerbandingan";
+        DIMENSI.forEach(function (d) {
+            const o = el("option", "", t("dimensi." + d));
+            o.value = d;
+            o.selected = d === dimensiPerbandingan;
+            sel.appendChild(o);
+        });
+        sel.addEventListener("change", function () { dimensiPerbandingan = sel.value; gambarPerbandingan(); });
+        kepala.appendChild(label);
+        kepala.appendChild(sel);
+        elPerbandingan.appendChild(kepala);
+
+        const grid = el("div", "grid gap-6 md:grid-cols-3");
+        elPerbandingan.appendChild(grid);
+        const legenda = el("div", "mt-4");
+        elPerbandingan.appendChild(legenda);
+        pilihanPerbandingan.forEach(function (k) {
+            const kolom = el("div", "min-w-0 rounded-xl border border-garis p-4");
+            kolom.dataset.uji = "kolom-perbandingan";
+            kolom.dataset.jenis = k.jenis;
+            kolom.appendChild(el("div", "text-sm font-medium", k.judul));
+            if (k.ket) kolom.appendChild(el("div", "text-mikro text-tinta-redup mb-3", k.ket));
+            grid.appendChild(kolom);
+            if (!k.siklusId) {
+                kolom.appendChild(el("p", "text-sm text-tinta-redup mt-3", t("aturan.bandingkan_belum_ada")));
+                return;
+            }
+            getJSON(urlAudit(k.siklusId, dimensiPerbandingan), function (hasil) {
+                if (!sehat(hasil, document.getElementById("pesanBayangan"))) return;
+                kolom.appendChild(plotRasio(hasil.data.data, { legenda: false }));
+                // Satu legenda untuk ketiga plot, diambil dari audit pertama yang tiba.
+                if (!legenda.firstChild) {
+                    const ul = plotRasio(hasil.data.data, { legenda: true }).querySelector("ul");
+                    if (ul) legenda.appendChild(ul);
+                }
+            }, ...tokenHeader());
+        });
+        elPerbandingan.appendChild(el("p", "mt-3 text-mikro text-tinta-redup", t("aturan.bandingkan_catatan")));
+    }
+
+    function siapkanPerbandingan(daftarAturan) {
+        const terbaru = function (mitigasi) {
+            return daftarAturan.find(function (a) { return a.asal === "dipelajari" && a.siklus_bayangan_id && !!a.mitigasi_aktif === mitigasi; });
+        };
+        const belajar = terbaru(false), mitigasi = terbaru(true);
+        muatSiklusDijalankan(document.getElementById("pesanBayangan"), function (siklus) {
+            const nyata = siklusBawaan(siklus.filter(function (s) { return !s.bayangan; }));
+            const versiNyata = nyata ? daftarAturan.find(function (a) { return a.id === nyata.aturan_id; }) : null;
+            pilihanPerbandingan = [
+                // Bila versi hasil belajar sudah diaktifkan, siklus sungguhan terbaru
+                // tidak lagi memakai aturan manual; judulnya menyebut itu.
+                { jenis: "manual", siklusId: nyata && nyata.id,
+                  judul: t(versiNyata && versiNyata.asal === "dipelajari" ? "aturan.bandingkan_berjalan" : "aturan.bandingkan_manual"),
+                  ket: nyata ? t("aturan.bandingkan_ket_siklus", { versi: versiNyata ? versiNyata.versi : "?", nama: nyata.nama }) : "" },
+                { jenis: "dipelajari", siklusId: belajar && belajar.siklus_bayangan_id, judul: t("aturan.bandingkan_dipelajari"),
+                  ket: belajar ? t("aturan.bandingkan_ket_versi", { versi: belajar.versi }) : "" },
+                { jenis: "mitigasi", siklusId: mitigasi && mitigasi.siklus_bayangan_id, judul: t("aturan.bandingkan_mitigasi"),
+                  ket: mitigasi ? t("aturan.bandingkan_ket_versi", { versi: mitigasi.versi }) : "" },
+            ];
+            gambarPerbandingan();
+        });
+    }
+
     function muatBayangan() {
         getJSON(asal + "/api/aturan?limit=200", function (hasil) {
             if (!sehat(hasil, document.getElementById("pesanBayangan"))) return;
+            siapkanPerbandingan(hasil.data.data || []);
             const ul = document.getElementById("daftarBayangan");
             kosongkan(ul);
             const dipelajari = (hasil.data.data || []).filter(function (a) { return a.asal === "dipelajari" && a.siklus_bayangan_id; });
@@ -392,6 +472,7 @@ if (requireLogin() && requireRole("H-05")) {
                 li.appendChild(tautan);
                 li.appendChild(el("span", "font-data text-mikro text-tinta-redup", t("aturan.akurasi_singkat", { akurasi: persen(a.akurasi) })));
                 if (a.aktif) li.appendChild(lencanaAktif(a));
+                if (a.mitigasi_aktif) li.appendChild(lencana(t("aturan.lencana_mitigasi"), "netral"));
                 if (perluTandaAI(a)) li.appendChild(lencanaAI());
                 if (a.catatan) li.appendChild(el("span", "basis-full text-mikro text-tinta-redup break-words", a.catatan));
                 ul.appendChild(li);

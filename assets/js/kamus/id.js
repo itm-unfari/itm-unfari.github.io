@@ -110,4 +110,8 @@ export default {
     "galat.aturan_tidak_sah": "Aturan matching tidak sah.",
     "galat.aturan_tidak_aktif": "Belum ada aturan matching yang aktif.",
     "galat.transisi_status_tidak_sah": "Perubahan status ini tidak diperbolehkan.",
+    "galat.saringan_tidak_sah": "Parameter penyaring tidak dikenal atau di luar dimensi yang diizinkan.",
+    "galat.metrik_butuh_label": "Metrik ini butuh label kebenaran yang belum tersedia untuk siklus manapun.",
+    "galat.ambang_terlalu_rendah": "Ambang kelompok tidak boleh diturunkan di bawah batas minimum.",
+    "galat.ambang_tidak_sah": "Nilai ambang tidak sah.",
 };

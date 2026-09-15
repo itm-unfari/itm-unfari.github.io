@@ -108,4 +108,8 @@ export default {
     "galat.aturan_tidak_sah": "Invalid matching rule.",
     "galat.aturan_tidak_aktif": "No active matching rule is set.",
     "galat.transisi_status_tidak_sah": "This status change is not allowed.",
+    "galat.saringan_tidak_sah": "Unknown filter parameter, or outside the allowed dimensions.",
+    "galat.metrik_butuh_label": "This metric needs ground-truth labels that are not yet available for any cycle.",
+    "galat.ambang_terlalu_rendah": "The group threshold cannot be lowered below the minimum floor.",
+    "galat.ambang_tidak_sah": "Invalid threshold value.",
 };

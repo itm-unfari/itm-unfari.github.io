@@ -6,11 +6,11 @@
 //   node uji-statis.mjs
 import { readFileSync, readdirSync, statSync } from "node:fs";
 import path from "node:path";
-import { muatModulFrontend, pelapor } from "./bantu.mjs";
+import { muatModulFrontend, pelapor, FRASA_CATATAN } from "./bantu.mjs";
 
 const AKAR = path.resolve(import.meta.dirname, "..");
 const p = pelapor("STATIS");
-const { LAYAR } = await muatModulFrontend();
+const { LAYAR, id: KAMUS_ID, en: KAMUS_EN } = await muatModulFrontend();
 
 function berkas(dir, hasil = []) {
     for (const n of readdirSync(dir)) {
@@ -94,7 +94,23 @@ for (const l of halaman) {
 p.lapor(`setiap layar tersedia punya halaman dengan kerangka dan kode yang sama (${halaman.length} layar)`, kerangka.length === 0, kerangka.join("; "));
 p.lapor("seluruh 24 kode layar tersedia", LAYAR.length === 24 && LAYAR.every((l) => l.tersedia), LAYAR.filter((l) => !l.tersedia).map((l) => l.kode).join(","));
 
+// Catatan internal tidak tampil di frontend (revisi 9): tidak ada teks kamus
+// yang memuat frasa catatan, dan halaman tidak membangun pita data sintetis.
+function frasaDiKamus(...kamus) {
+    const kena = [];
+    for (const k of kamus) for (const [kunci, nilai] of Object.entries(k)) {
+        const n = String(nilai).toLowerCase();
+        FRASA_CATATAN.forEach((f) => { if (n.includes(f)) kena.push(`${kunci}: "${f}"`); });
+    }
+    return kena;
+}
+const frasa = frasaDiKamus(KAMUS_ID, KAMUS_EN);
+p.lapor("kamus tidak memuat teks catatan internal", frasa.length === 0, frasa.join("; "));
+const pita = berkas(AKAR).filter((f) => /pita-sintetis|pita_sintetis|umum\.tandaAI/.test(readFileSync(f, "utf8"))).map((f) => path.relative(AKAR, f));
+p.lapor("halaman tidak membangun pita data sintetis maupun label usulan AI", pita.length === 0, pita.join(", "));
+
 // ── negatif: pemeriksa harus menangkap kesalahan yang disengaja ──
+p.lapor("negatif: frasa catatan di kamus tertangkap", frasaDiKamus({ "x.y": "Data sintetis — bukan data karyawan sungguhan" }).length === 1);
 {
     const buruk = 'getJSON(url, function (hasil) {\n    const d = hasil.data.data;\n    tampil(d);\n}, ...tokenHeader());';
     p.lapor("negatif: callback tanpa sehat() tertangkap", periksaCallback(buruk).masalah.length === 1);

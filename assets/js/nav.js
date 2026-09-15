@@ -53,10 +53,6 @@ export function pasang(kode) {
 
     const pita = el("div", "pita-atas");
     pita.setAttribute("aria-hidden", "true");
-    // Selama aturan keselamatan §4.1 berlaku, seluruh data aplikasi sintetis.
-    const sintetis = el("div", "pita-sintetis", t("aplikasi.pita_sintetis"));
-    sintetis.setAttribute("role", "note");
-    sintetis.dataset.uji = "pita-sintetis";
 
     const kepala = el("header", "border-b border-garis bg-kertas");
     const isi = el("div", "mx-auto flex max-w-6xl flex-wrap items-center gap-4 px-5 py-3");
@@ -102,6 +98,6 @@ export function pasang(kode) {
     isi.appendChild(kanan);
     kepala.appendChild(isi);
 
-    document.body.prepend(pita, sintetis, kepala);
+    document.body.prepend(pita, kepala);
     terapkan();
 }

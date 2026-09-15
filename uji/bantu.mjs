@@ -222,3 +222,24 @@ export async function layarLangsung(peranPaksa) {
         return { kode: l.kode, jalur: l.url, query: param[l.kode] || "", sesi: l.kode !== "U-01", peran, u: sesi[peran].user, token: sesi[peran].token };
     });
 }
+
+// ── catatan internal (§14.1, §16.2 revisi 9) ──
+
+// FRASA_CATATAN: potongan teks yang hanya muncul di catatan internal (konteks
+// riset, metodologi, status telaah). Tempatnya repo itm-unfari/docs, bukan
+// layar. Huruf kecil; dicocokkan pada innerText halaman.
+export const FRASA_CATATAN = [
+    "data sintetis", "synthetic data", "belum ditelaah", "not yet reviewed",
+    "empat-per", "four-fifths", "uniform guidelines", "delphi",
+];
+
+// catatanTampil mengembalikan daftar catatan internal yang terlihat di halaman
+// (kosong = bersih): frasa di atas dan elemen pita data sintetis.
+export async function catatanTampil(page) {
+    return page.evaluate((frasa) => {
+        const teks = document.body.innerText.toLowerCase();
+        const kena = frasa.filter((f) => teks.includes(f));
+        if (document.querySelector(".pita-sintetis, [data-uji='pita-sintetis']")) kena.push("elemen pita-sintetis");
+        return kena;
+    }, FRASA_CATATAN);
+}

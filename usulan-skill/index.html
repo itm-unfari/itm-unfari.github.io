@@ -17,7 +17,6 @@
 
   <section class="kartu p-6">
     <h2 class="eyebrow text-tinta-redup mb-2" data-i18n="usulanSkill.tempel_judul">Tempel teks pengalaman Anda</h2>
-    <p class="text-sm text-tinta-redup mb-4" data-i18n="usulanSkill.tempel_ket">AI membaca teks ini dan mengusulkan skill dengan kutipan buktinya.</p>
     <form id="formTeks" class="space-y-4" novalidate>
       <label for="teks" class="sr-only" data-i18n="usulanSkill.tempel_judul">Tempel teks pengalaman Anda</label>
       <textarea id="teks" class="medan" rows="6" required></textarea>
@@ -85,11 +84,7 @@ if (requireLogin() && requireRole("K-02")) {
         const atas = el("div", "flex flex-wrap items-center gap-2");
         atas.appendChild(el("span", "font-medium", namaSkill(b.kode)));
         atas.appendChild(el("span", "text-tinta-redup text-sm", t("tingkat." + b.tingkat_perkiraan)));
-        if (b.status === "usulan") {
-            const ai = lencana(t("umum.tandaAI"), "tinjau");
-            ai.dataset.uji = "tanda-ai";
-            atas.appendChild(ai);
-        } else {
+        if (b.status !== "usulan") {
             atas.appendChild(statusLencana(b.status));
             if (b.tingkat_diputuskan) atas.appendChild(el("span", "text-tinta-redup text-sm", "→ " + t("tingkat." + b.tingkat_diputuskan)));
         }

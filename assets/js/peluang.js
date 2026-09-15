@@ -480,7 +480,6 @@ export function pasangLayarPeluang(opsi) {
     function gambarUsulan(p, elPesanDetail) {
         const sek = el("div", "mt-6 border-t border-garis pt-5 space-y-3");
         sek.appendChild(el("h3", "eyebrow text-tinta-redup", t("peluang.usulan_judul")));
-        sek.appendChild(el("p", "text-sm text-tinta-redup", t("peluang.usulan_ket")));
         const elStatus = el("p", "text-sm text-tinta-redup");
         elStatus.setAttribute("aria-live", "polite");
         const btn = tombol(t("peluang.usulkan"), "tombol-halus", function () {
@@ -596,9 +595,7 @@ export function pasangLayarPeluang(opsi) {
         const atasB = el("div", "flex flex-wrap items-center gap-2");
         atasB.appendChild(el("span", "font-medium break-words", namaSkill(b.kode)));
         atasB.appendChild(el("span", "text-sm text-tinta-redup", t("peluang.tingkat_perkiraan", { tingkat: namaTingkat(b.tingkat_perkiraan) })));
-        if (b.status === "usulan") {
-            atasB.appendChild(lencana(t("umum.tandaAI"), "tinjau"));
-        } else {
+        if (b.status !== "usulan") {
             atasB.appendChild(lencana(t("status.usulan." + b.status), b.status === "ditolak" ? "netral" : "sah"));
             if (b.tingkat_diputuskan) atasB.appendChild(el("span", "text-sm text-tinta-redup", "→ " + namaTingkat(b.tingkat_diputuskan)));
         }

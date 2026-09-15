@@ -8,7 +8,7 @@
 import { chromium } from "playwright";
 import {
     FE, SANDI_UJI, pelapor, muatModulFrontend, pasangApiTiruan, penjawabBaku,
-    amplopOk, amplopGalat, pengguna, pasangSesi, redamFont, jalurDari, opsiPeluncur,
+    amplopOk, amplopGalat, pengguna, pasangSesi, redamFont, jalurDari, opsiPeluncur, catatanTampil,
 } from "./bantu.mjs";
 
 const p = pelapor("API TIRUAN — " + FE);
@@ -72,9 +72,17 @@ try {
         await page.goto(FE + "/login/", { waitUntil: "networkidle" });
         p.lapor('/login/ memuat dengan <html lang="id"> bawaan', (await page.evaluate(() => document.documentElement.lang)) === "id");
         p.lapor("tirai i18n-tunggu sudah dibuka setelah modul berjalan", await page.evaluate(() => !document.documentElement.classList.contains("i18n-tunggu")));
-        const pita = page.locator('[data-uji="pita-sintetis"]');
-        p.lapor("pita data sintetis terlihat", await pita.isVisible());
-        p.lapor("teks pita dari kamus id", (await pita.textContent()) === id["aplikasi.pita_sintetis"]);
+        const catatan = await catatanTampil(page);
+        p.lapor("tidak ada catatan internal di /login/ (pita data sintetis, dsb.)", catatan.length === 0, catatan.join(", "));
+        // Negatif: pendeteksi harus menemukan pita dan frasa catatan yang disisipkan.
+        await page.evaluate(() => {
+            const d = document.createElement("div");
+            d.className = "pita-sintetis";
+            d.textContent = "Data sintetis — bukan data karyawan sungguhan";
+            document.body.prepend(d);
+        });
+        const sisipan = await catatanTampil(page);
+        p.lapor("negatif: pita dan frasa catatan yang disisipkan terdeteksi", sisipan.includes("elemen pita-sintetis") && sisipan.includes("data sintetis"), sisipan.join(", "));
         p.lapor("judul dokumen dari kamus id", (await page.title()) === id["masuk.judul_halaman"]);
         p.lapor("sakelar bahasa tergambar (ID/EN)", (await page.locator("#wadahBahasa .segmen button").count()) === 2);
         p.lapor("segmen ID ditandai aria-pressed", (await page.getAttribute('#wadahBahasa button[data-nilai="id"]', "aria-pressed")) === "true");
@@ -121,7 +129,7 @@ try {
         await page.waitForFunction(() => document.getElementById("uname").textContent.length > 0, null, { timeout: 8000 }).catch(() => {});
         p.lapor("/akun/ menampilkan uname dari /auth/me", (await page.locator("#uname").textContent()) === "uji.karyawan");
         p.lapor("/akun/ menampilkan peran dari kamus (peran.4)", (await page.locator("#peran").textContent()) === id["peran.4"]);
-        p.lapor("pita data sintetis ada di /akun/", await page.locator('[data-uji="pita-sintetis"]').isVisible());
+        p.lapor("tidak ada catatan internal di /akun/", (await catatanTampil(page)).length === 0);
         p.lapor("kepala halaman memuat judul layar U-02", (await page.locator("header h1").textContent()) === id["layar.U-02"]);
 
         const masuk = dicatat.find((r) => r.jalur === "/auth/login");
@@ -346,7 +354,7 @@ try {
         const harapNav = layarUntuk(role).length > 1 ? 1 : 0;
         p.lapor(`peran ${role}: <nav> ${harapNav ? "ada" : "tidak ada"} sesuai layarUntuk() (${layarUntuk(role).length} tautan)`, nNav === harapNav, `nav=${nNav}`);
         p.lapor(`peran ${role}: nama peran dari kamus`, (await page.locator("#peran").textContent()) === id["peran." + role]);
-        p.lapor(`peran ${role}: pita data sintetis ada`, await page.locator('[data-uji="pita-sintetis"]').isVisible());
+        p.lapor(`peran ${role}: tidak ada catatan internal di /akun/`, (await catatanTampil(page)).length === 0);
         tanpaGalat(`peran ${role}`, galat);
         await ctx.close();
     }

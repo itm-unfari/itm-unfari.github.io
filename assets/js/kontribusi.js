@@ -110,7 +110,4 @@ export function renderKontribusi(wadah, match, skillMap) {
         legenda.appendChild(li);
     });
     wadah.appendChild(legenda);
-
-    const kunci = el("p", "mt-4 text-mikro text-tinta-redup", t("kontribusi.keterangan"));
-    wadah.appendChild(kunci);
 }

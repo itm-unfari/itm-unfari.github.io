@@ -4,8 +4,9 @@
 // ditambah: kutipan K-02 tersorot tepat pada posisinya dan bertanda usulan AI
 // sampai diputuskan; batang kontribusi = kalimat penjelasan; penjelasan satu
 // match sama (skill, urutan, angka) di K-04 dan H-02 serta dalam dua bahasa;
-// mode pakar menampilkan kode layar di setiap layar yang bisa dibukanya dan
-// taksonomi draf bertanda belum ditelaah; pita data sintetis di setiap layar.
+// mode pakar menampilkan kode layar di setiap layar yang bisa dibukanya; tidak
+// ada catatan internal (pita data sintetis, label usulan AI/belum ditelaah,
+// keterangan metodologi) di layar mana pun.
 //
 // Butuh backend 8095 dengan data generator (go run ./tools/sintetis) dan
 // repo backend bersebelahan (tools/pekerja-ai), lihat README.
@@ -14,7 +15,7 @@
 import { chromium } from "playwright";
 import {
     FE, pelapor, muatModulFrontend, pasangSesi, redamFont, jalurDari, opsiPeluncur,
-    masukApi, apiJSON, jalankanPekerjaAI,
+    masukApi, apiJSON, jalankanPekerjaAI, catatanTampil,
 } from "./bantu.mjs";
 
 const p = pelapor("ALUR — " + FE);
@@ -50,7 +51,8 @@ async function klikNav(page, url) {
     await page.waitForLoadState("networkidle");
     await page.waitForTimeout(500);
 }
-const pitaTampil = (page) => page.locator('[data-uji="pita-sintetis"]').isVisible();
+// bersih: tidak ada catatan internal yang terlihat (revisi 9 rencana).
+const bersih = async (page) => (await catatanTampil(page)).length === 0;
 const tanpaGalat = (nama, galat) => p.lapor(`${nama}: tanpa galat JavaScript`, galat.length === 0, galat.join(" | "));
 
 // bacaPenjelasan mengumpulkan angka batang, legenda, dan kalimat dari
@@ -90,7 +92,7 @@ try {
         const { ctx, page, galat } = await halaman();
         await masukUI(page, "uji.karyawan");
         p.lapor("U-01 → layar pertama karyawan", jalurDari(page.url()) === layarUntuk(PERAN.KARYAWAN).find((l) => l.kode !== "U-02").url, page.url());
-        let pita = await pitaTampil(page);
+        let pita = await bersih(page);
 
         await klikNav(page, "/usulan-skill/");
         await page.fill("#teks", TEKS_REKAMAN);
@@ -106,17 +108,17 @@ try {
         });
         p.lapor("K-02: kutipan tersorot tepat pada posisinya di teks sumber", !!sorot && sorot.mark === KUTIPAN_REKAMAN && sorot.utuh === TEKS_REKAMAN && sorot.sebelum === "Saya terbiasa ", JSON.stringify(sorot));
         const butir = page.locator('[data-uji="hasil-baru"] [data-uji="butir-usulan"]').first();
-        p.lapor("K-02: butir belum diputuskan bertanda usulan AI", (await butir.locator('[data-uji="tanda-ai"]').count()) === 1);
+        p.lapor("K-02: butir belum diputuskan punya tombol keputusan, tanpa label usulan AI", (await butir.getByRole("button", { name: id["usulanSkill.terima"] }).count()) === 1 && !(await butir.textContent()).includes(id["bukti.usulan_ai"]));
         await butir.getByRole("button", { name: id["usulanSkill.terima"] }).click();
         await page.waitForTimeout(1000);
         const butirSetelah = page.locator('[data-uji="hasil-baru"] [data-uji="butir-usulan"]').first();
-        p.lapor("K-02: setelah diterima, penanda usulan AI hilang dan status Diterima", (await butirSetelah.locator('[data-uji="tanda-ai"]').count()) === 0 && (await butirSetelah.textContent()).includes(id["status.usulan.diterima"]));
-        pita = pita && await pitaTampil(page);
+        p.lapor("K-02: setelah diterima, tombol keputusan hilang dan status Diterima", (await butirSetelah.getByRole("button", { name: id["usulanSkill.terima"] }).count()) === 0 && (await butirSetelah.textContent()).includes(id["status.usulan.diterima"]));
+        pita = pita && await bersih(page);
 
         await klikNav(page, "/profil/");
         const barisDat = page.locator("#wadahTabel tbody tr").filter({ hasText: "DAT-01" });
         p.lapor("K-01: skill yang diterima masuk profil dengan sumber usulan AI", (await barisDat.count()) === 1 && (await barisDat.textContent()).includes(id["bukti.usulan_ai"]));
-        pita = pita && await pitaTampil(page);
+        pita = pita && await bersih(page);
 
         await klikNav(page, "/rekomendasi/");
         p.lapor("K-03: batang kontribusi di setiap baris", (await page.locator('[data-uji="batang-kontribusi"]').count()) === (await page.locator("#wadahTabel tbody tr").count()));
@@ -126,7 +128,7 @@ try {
         const idK04 = await bacaPenjelasan(page);
         p.lapor("K-04: batang kontribusi dan kalimat penjelasan menampilkan angka yang sama", batangSamaKalimat(idK04), JSON.stringify(idK04).slice(0, 300));
         matchKaryawan.penjelasan = idK04;
-        pita = pita && await pitaTampil(page);
+        pita = pita && await bersih(page);
 
         await page.click('header .segmen button[data-nilai="en"]');
         await page.waitForLoadState("networkidle");
@@ -139,8 +141,8 @@ try {
         await page.goto(FE + "/riwayat/", { waitUntil: "networkidle" });
         await page.waitForTimeout(500);
         p.lapor("K-05: riwayat memuat match yang baru dilihat", (await page.locator(`#wadahTabel a[href="/penjelasan/?id=${encodeURIComponent(matchKaryawan.id)}"]`).count()) === 1);
-        pita = pita && await pitaTampil(page);
-        p.lapor("alur karyawan: pita data sintetis di setiap layar", pita);
+        pita = pita && await bersih(page);
+        p.lapor("alur karyawan: tidak ada catatan internal di setiap layar", pita);
         tanpaGalat("alur karyawan", galat);
         await ctx.close();
     }
@@ -155,7 +157,7 @@ try {
         const { ctx, page, galat } = await halaman();
         await masukUI(page, "uji.hr");
         p.lapor("U-01 → H-01 untuk HR", jalurDari(page.url()) === "/pipeline/", page.url());
-        let pita = await pitaTampil(page);
+        let pita = await bersih(page);
         const namaSiklus = "Siklus Alur " + tanda;
         await page.fill("#namaSiklus", namaSiklus);
         await page.locator("#daftarPeluang label").filter({ hasText: "Alur Uji " + tanda }).locator("input[type=checkbox]").check();
@@ -179,7 +181,7 @@ try {
         await aksi.click();
         await page.waitForTimeout(1000);
         p.lapor("H-02: keputusan HR tercatat di riwayat status beserta catatan", (await page.locator("#wadahRiwayat").textContent()).includes("Ditinjau dalam uji alur"), labelAksi);
-        pita = pita && await pitaTampil(page);
+        pita = pita && await bersih(page);
 
         await page.goto(FE + "/detail-kandidat/?id=" + encodeURIComponent(matchKaryawan.id), { waitUntil: "networkidle" });
         const h02Sama = await bacaPenjelasan(page);
@@ -192,7 +194,7 @@ try {
         await page.waitForURL("**/fairness/**");
         await page.waitForSelector('[data-uji="plot-fairness"]', { timeout: 10000 });
         p.lapor("H-04: dari pipeline ke dashboard fairness siklus itu, empat dimensi", (await page.locator('[data-uji="plot-fairness"]').count()) >= 4 && new URL(page.url()).searchParams.get("siklus") !== null);
-        pita = pita && await pitaTampil(page);
+        pita = pita && await bersih(page);
 
         await klikNav(page, "/aturan/");
         await page.click("#tombolLatihMitigasi");
@@ -207,7 +209,7 @@ try {
             return a && z ? !!(a.compareDocumentPosition(z) & Node.DOCUMENT_POSITION_FOLLOWING) : null;
         });
         p.lapor("H-05: hasil pemeriksaan proksi tampil sebelum tombol aktifkan", urut === true, String(urut));
-        pita = pita && await pitaTampil(page);
+        pita = pita && await bersih(page);
 
         await klikNav(page, "/grafik-skill/");
         await page.click("#tombolUsulkan");
@@ -215,22 +217,22 @@ try {
         await jalankanPekerjaAI();
         await page.goto(FE + "/grafik-skill/", { waitUntil: "networkidle" });
         await page.waitForTimeout(800);
-        p.lapor("H-06: tepi usulan AI bertanda usulan AI", (await page.locator('#wadahTabel [data-uji="tanda-ai"]').count()) > 0);
-        pita = pita && await pitaTampil(page);
+        p.lapor("H-06: tepi usulan yang belum diputuskan punya tombol terima", (await page.locator("#wadahTabel").getByRole("button", { name: id["grafikSkill.terima"] }).count()) > 0);
+        pita = pita && await bersih(page);
 
         await klikNav(page, "/kondisi-batas/");
         p.lapor("H-07: versi kondisi batas aktif tampil", (await page.locator("main").textContent()).includes("D4"));
-        pita = pita && await pitaTampil(page);
+        pita = pita && await bersih(page);
 
         await klikNav(page, "/log-audit/");
         p.lapor("A-03: menjalankan siklus dan keputusan match tercatat di log audit", (await page.locator("main tbody").textContent()).includes(id["logAudit.aksi.siklus_jalankan"]) && (await page.locator("main tbody").textContent()).includes(id["logAudit.aksi.match_status_ubah"]));
-        pita = pita && await pitaTampil(page);
-        p.lapor("alur HR: pita data sintetis di setiap layar", pita);
+        pita = pita && await bersih(page);
+        p.lapor("alur HR: tidak ada catatan internal di setiap layar", pita);
         tanpaGalat("alur HR", galat);
         await ctx.close();
     }
 
-    // ── 3. Mode pakar dan pita sintetis di setiap layar setiap peran ──
+    // ── 3. Mode pakar dan catatan internal di setiap layar setiap peran ──
     {
         const idKaryawanMatch = ((await apiJSON(hr.token, "/api/match/" + encodeURIComponent(matchKaryawan.id))).data || {}).karyawan.id;
         const param = { "K-03": "?karyawan_id=" + encodeURIComponent(idKaryawanMatch), "K-04": "?id=" + encodeURIComponent(matchKaryawan.id), "H-02": "?id=" + encodeURIComponent(matchKaryawan.id), "M-02": "?peluang=" };
@@ -243,25 +245,21 @@ try {
             const { ctx, page, galat } = await halaman();
             await pasangSesi(page, s.user, s.token);
             const layar = LAYAR.filter((l) => l.tersedia && l.kode !== "U-01" && l.peran.includes(peran));
-            const tanpaPita = [], salahKode = [], pindah = [];
+            const bercatatan = [], salahKode = [], pindah = [];
             for (const l of layar) {
                 await page.goto(FE + l.url + (param[l.kode] || ""), { waitUntil: "networkidle" });
                 await page.waitForTimeout(300);
                 if (jalurDari(page.url()) !== l.url) { pindah.push(`${l.kode}→${jalurDari(page.url())}`); continue; }
-                if (!(await pitaTampil(page))) tanpaPita.push(l.kode);
+                const kena = await catatanTampil(page);
+                if (kena.length) bercatatan.push(`${l.kode}: ${kena.join("/")}`);
                 if (peran === PERAN.PAKAR) {
                     const k = await page.locator('[data-uji="kode-layar"]').textContent().catch(() => "");
                     if (k !== l.kode) salahKode.push(`${l.kode}:${k}`);
                 } else if (await page.locator('[data-uji="kode-layar"]').count()) salahKode.push(`${l.kode}:tampil`);
             }
             p.lapor(`peran ${peran}: ${layar.length} layar terbuka tanpa dialihkan`, pindah.length === 0, pindah.join(", "));
-            p.lapor(`peran ${peran}: pita data sintetis di setiap layar`, tanpaPita.length === 0, tanpaPita.join(","));
+            p.lapor(`peran ${peran}: tidak ada catatan internal di setiap layar`, bercatatan.length === 0, bercatatan.join("; "));
             p.lapor(peran === PERAN.PAKAR ? "pakar: kode layar tampil di setiap layar yang bisa dibuka" : `peran ${peran}: kode layar tidak tampil`, salahKode.length === 0, salahKode.join(", "));
-            if (peran === PERAN.PAKAR) {
-                await page.goto(FE + "/taksonomi/", { waitUntil: "networkidle" });
-                const st = await page.locator('[data-uji="status-taksonomi"]').first().textContent().catch(() => "");
-                p.lapor("pakar: taksonomi draf bertanda belum ditelaah", st.includes(id["status.taksonomi.draf"]), st);
-            }
             tanpaGalat(`peran ${peran} di semua layarnya`, galat);
             await ctx.close();
         }

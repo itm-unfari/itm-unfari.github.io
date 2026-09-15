@@ -17,7 +17,6 @@
 
   <section class="kartu p-6">
     <h2 class="eyebrow text-tinta-redup mb-2" data-i18n="aturan.daftar_judul">Versi aturan matching</h2>
-    <p class="text-sm text-tinta-redup mb-4" data-i18n="aturan.daftar_ket">Setiap perubahan membuat versi baru; hanya satu versi yang aktif dan dipakai siklus berikutnya.</p>
     <div id="wadahDaftar"></div>
     <div id="navDaftar"></div>
   </section>
@@ -33,7 +32,6 @@
 
   <section id="bagianLatih" class="kartu p-6" hidden>
     <h2 class="eyebrow text-tinta-redup mb-2" data-i18n="aturan.latih_judul">Latih aturan dari riwayat mobilitas</h2>
-    <p class="text-sm text-tinta-redup mb-4" data-i18n="aturan.latih_ket">Pelatihan menghasilkan versi kandidat berasal "dipelajari" yang tidak pernah aktif dengan sendirinya. Mitigasi bias menekan fitur yang berkorelasi kuat dengan atribut terlindungi.</p>
     <div class="flex flex-wrap gap-2">
       <button type="button" id="tombolLatih" class="tombol-halus" data-i18n="aturan.latih">Latih aturan</button>
       <button type="button" id="tombolLatihMitigasi" class="tombol-halus" data-i18n="aturan.latih_mitigasi">Latih dengan mitigasi bias</button>
@@ -43,7 +41,6 @@
 
   <section id="bagianBuat" class="kartu p-6" hidden>
     <h2 class="eyebrow text-tinta-redup mb-2" data-i18n="aturan.buat_judul">Buat versi manual</h2>
-    <p class="text-sm text-tinta-redup mb-4" data-i18n="aturan.buat_ket">Versi baru dibuat dalam keadaan nonaktif. Aktifkan setelah ditinjau.</p>
     <div id="pesanBuat" hidden role="alert"></div>
     <form id="formBuat" class="space-y-4" novalidate>
       <div class="grid gap-4 sm:grid-cols-3">
@@ -76,7 +73,6 @@
 
   <section class="kartu p-6">
     <h2 class="eyebrow text-tinta-redup mb-2" data-i18n="aturan.perbandingan_judul">Perbandingan fairness: manual vs dipelajari vs dipelajari dengan mitigasi</h2>
-    <p class="text-sm text-tinta-redup mb-4" data-i18n="aturan.perbandingan_ket">Setiap versi dipelajari dijalankan pada siklus bayangan, sehingga fairness-nya bisa dibandingkan tanpa mengubah apa yang dilihat karyawan.</p>
     <div id="wadahPerbandingan" data-uji="perbandingan-aturan"></div>
     <h3 class="text-sm font-medium mt-5 mb-2" data-i18n="aturan.bayangan_judul">Siklus bayangan versi dipelajari</h3>
     <div id="pesanBayangan" hidden role="alert"></div>
@@ -153,7 +149,6 @@ if (requireLogin() && requireRole("H-05")) {
         };
     }
 
-    function perluTandaAI(a) { return a.asal === "dipelajari" && !a.aktif; }
 
     function fiturProksi(a) { return Array.isArray(a.fitur_proksi) ? a.fitur_proksi : []; }
 
@@ -161,12 +156,6 @@ if (requireLogin() && requireRole("H-05")) {
 
     function lencanaAktif(a) {
         return a.aktif ? lencana(t("umum.aktif"), "sah") : lencana(t("umum.nonaktif"), "netral");
-    }
-
-    function lencanaAI() {
-        const l = lencana(t("umum.tandaAI"), "tinjau");
-        l.dataset.uji = "tanda-ai";
-        return l;
     }
 
     function gambarNav(wadah, meta, muat) {
@@ -214,7 +203,6 @@ if (requireLogin() && requireRole("H-05")) {
         daftar.forEach(function (a) {
             const versi = el("div", "flex flex-wrap items-center gap-1.5 min-w-[7rem]");
             versi.appendChild(el("span", "font-data font-medium", a.versi));
-            if (perluTandaAI(a)) versi.appendChild(lencanaAI());
             const proksi = fiturProksi(a);
             if (proksi.length) versi.appendChild(lencana(t("aturan.jumlah_proksi", { n: proksi.length }), "tinjau"));
             const detail = tombol(t("umum.detail"));
@@ -290,7 +278,6 @@ if (requireLogin() && requireRole("H-05")) {
         kepala.appendChild(el("span", "judul-halaman text-lg font-data", a.versi));
         kepala.appendChild(lencanaAsal(a));
         kepala.appendChild(lencanaAktif(a));
-        if (perluTandaAI(a)) kepala.appendChild(lencanaAI());
         wadahDetail.appendChild(kepala);
 
         const info = el("dl", "grid gap-x-6 gap-y-3 text-sm sm:grid-cols-3");
@@ -352,7 +339,6 @@ if (requireLogin() && requireRole("H-05")) {
             return kotak;
         }
         kotak.appendChild(el("p", "text-sm font-semibold", t("aturan.proksi_ada_judul", { n: proksi.length })));
-        kotak.appendChild(el("p", "text-sm", t("aturan.proksi_ada_ket")));
         const ul = el("ul", "flex flex-wrap gap-2");
         proksi.forEach(function (f) { ul.appendChild(el("li", "rounded-md border border-tinjau px-2 py-0.5 font-data text-sm break-all", f)); });
         kotak.appendChild(ul);
@@ -428,7 +414,6 @@ if (requireLogin() && requireRole("H-05")) {
                 }
             }, ...tokenHeader());
         });
-        elPerbandingan.appendChild(el("p", "mt-3 text-mikro text-tinta-redup", t("aturan.bandingkan_catatan")));
     }
 
     function siapkanPerbandingan(daftarAturan) {
@@ -473,7 +458,6 @@ if (requireLogin() && requireRole("H-05")) {
                 li.appendChild(el("span", "font-data text-mikro text-tinta-redup", t("aturan.akurasi_singkat", { akurasi: persen(a.akurasi) })));
                 if (a.aktif) li.appendChild(lencanaAktif(a));
                 if (a.mitigasi_aktif) li.appendChild(lencana(t("aturan.lencana_mitigasi"), "netral"));
-                if (perluTandaAI(a)) li.appendChild(lencanaAI());
                 if (a.catatan) li.appendChild(el("span", "basis-full text-mikro text-tinta-redup break-words", a.catatan));
                 ul.appendChild(li);
             });

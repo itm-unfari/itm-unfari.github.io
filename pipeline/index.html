@@ -30,14 +30,12 @@
 
   <section class="kartu p-6">
     <h2 class="eyebrow text-tinta-redup mb-2" data-i18n="pipeline.daftar_judul">Siklus pencocokan</h2>
-    <p class="text-sm text-tinta-redup mb-4" data-i18n="pipeline.daftar_ket">Siklus bayangan dipakai untuk membandingkan aturan matching; hasilnya tidak mengubah apa yang dilihat karyawan.</p>
     <div id="wadahSiklus"></div>
     <div id="navSiklus"></div>
   </section>
 
   <section id="bagianBuat" class="kartu p-6" hidden>
     <h2 class="eyebrow text-tinta-redup mb-2" data-i18n="pipeline.buat_judul">Buat siklus baru</h2>
-    <p class="text-sm text-tinta-redup mb-4" data-i18n="pipeline.buat_ket">Pilih peluang berstatus terbuka. Siklus memakai aturan matching yang sedang aktif dan baru menghasilkan kandidat setelah dijalankan.</p>
     <div id="pesanBuat" hidden role="alert"></div>
     <form id="formBuat" class="space-y-4" novalidate>
       <div>
@@ -180,10 +178,7 @@ if (requireLogin() && requireRole("H-01")) {
         daftar.forEach(function (s) {
             const nama = el("div", "min-w-[12rem] space-y-1");
             nama.appendChild(el("div", "font-medium break-words", s.nama));
-            if (s.bayangan) {
-                nama.appendChild(lencanaBayangan());
-                nama.appendChild(el("div", "text-mikro text-tinta-redup", t("pipeline.bayangan_ket")));
-            }
+            if (s.bayangan) nama.appendChild(lencanaBayangan());
             const aksi = el("div", "flex flex-wrap gap-2");
             if (s.status === "dijalankan") {
                 const lihat = tombol(t("pipeline.lihat_pipeline"));
@@ -286,9 +281,6 @@ if (requireLogin() && requireRole("H-01")) {
         lencanaBaris.appendChild(lencana(t("status.siklus." + s.status), s.status === "dijalankan" ? "sah" : "netral"));
         if (s.bayangan) lencanaBaris.appendChild(lencanaBayangan());
         kepalaPipeline.appendChild(lencanaBaris);
-        if (s.bayangan) {
-            kepalaPipeline.appendChild(el("p", "rounded-xl bg-latar px-3 py-2 text-sm text-tinta-redup", t("pipeline.bayangan_ket")));
-        }
 
         const info = el("dl", "grid gap-x-6 gap-y-2 text-sm sm:grid-cols-3");
         [

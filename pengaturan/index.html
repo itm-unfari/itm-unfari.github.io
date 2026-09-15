@@ -18,31 +18,24 @@
   <form id="formPengaturan" class="space-y-5" novalidate>
     <section class="kartu p-6">
       <h2 class="eyebrow text-tinta-redup mb-3" data-i18n="pengaturan.kelompok_judul">Ambang kelompok minimum</h2>
-      <p class="text-sm text-tinta-redup mb-4" data-i18n="pengaturan.kelompok_ket">Agregat fairness untuk kelompok yang lebih kecil dari angka ini disembunyikan.</p>
       <label for="ambangKelompok" class="block text-sm font-medium mb-1.5" data-i18n="pengaturan.kelompok_label">Jumlah orang minimum per kelompok</label>
       <input id="ambangKelompok" type="number" min="10" step="1" class="medan font-data max-w-[10rem]" required>
-      <p class="text-mikro text-tinta-redup mt-2" data-i18n="pengaturan.kelompok_lantai">Lantai di kode adalah 10: angka ini hanya bisa dinaikkan.</p>
     </section>
 
     <section class="kartu p-6">
       <h2 class="eyebrow text-tinta-redup mb-3" data-i18n="pengaturan.penanda_judul">Ambang penanda fairness</h2>
-      <p class="text-sm text-tinta-redup mb-4" data-i18n="pengaturan.penanda_ket">Rasio tingkat rekomendasi sebuah kelompok terhadap kelompok tertinggi di bawah angka ini ditandai "perlu ditinjau".</p>
       <label for="ambangPenanda" class="block text-sm font-medium mb-1.5" data-i18n="pengaturan.penanda_label">Rasio (lebih dari 0, paling banyak 1)</label>
       <input id="ambangPenanda" type="number" min="0.01" max="1" step="0.01" class="medan font-data max-w-[10rem]" required>
-      <p class="text-mikro text-tinta-redup mt-2" data-i18n="pengaturan.penanda_acuan">Bawaan 0,8 mengikuti aturan empat-per-lima.</p>
     </section>
 
     <section class="kartu p-6">
       <h2 class="eyebrow text-tinta-redup mb-3" data-i18n="pengaturan.kemiripan_judul">Ambang kemiripan tepi grafik skill</h2>
-      <p class="text-sm text-tinta-redup mb-4" data-i18n="pengaturan.kemiripan_ket">Pasangan skill dengan kemiripan embedding di atas angka ini diusulkan sebagai tepi.</p>
       <label for="ambangKemiripan" class="block text-sm font-medium mb-1.5" data-i18n="pengaturan.kemiripan_label">Kemiripan kosinus (lebih dari 0, paling banyak 1)</label>
       <input id="ambangKemiripan" type="number" min="0.01" max="1" step="0.01" class="medan font-data max-w-[10rem]" required>
-      <p class="text-mikro text-tinta-redup mt-2" data-i18n="pengaturan.kemiripan_acuan">Bawaan 0,75 adalah titik awal tanpa acuan eksternal.</p>
     </section>
 
     <div class="flex flex-wrap items-center gap-3">
       <button type="submit" id="tombolSimpan" class="tombol-utama" data-i18n="umum.simpan">Simpan</button>
-      <span class="text-mikro text-tinta-redup" data-i18n="pengaturan.tercatat">Setiap perubahan tercatat di log audit.</span>
     </div>
   </form>
 </main>

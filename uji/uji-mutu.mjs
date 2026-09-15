@@ -12,7 +12,7 @@
 //                                        backend sungguhan (8095), tiap layar
 //                                        dibuka peran utamanya
 import { chromium } from "playwright";
-import { FE, pelapor, pasangApiTiruan, penjawabBaku, pengguna, redamFont, opsiPeluncur, layarLangsung } from "./bantu.mjs";
+import { FE, pelapor, pasangApiTiruan, penjawabBaku, pengguna, redamFont, opsiPeluncur, layarLangsung, muatModulFrontend } from "./bantu.mjs";
 
 const arg = Object.fromEntries(process.argv.slice(2).map((a) => {
     const m = a.match(/^--([^=]+)(?:=(.*))?$/);
@@ -33,8 +33,23 @@ const keRgb = (h) => (h ? [0, 2, 4].map((i) => parseInt(h.slice(i, i + 2), 16)).
 const utamaRgb = keRgb(UTAMA), utamaGelapRgb = keRgb(UTAMA_GELAP);
 
 const p = pelapor(HARAP_GAGAL ? `MUTU — uji negatif: --utama=${UTAMA} harus menggagalkan kontras` : `MUTU — ${FE}${UTAMA ? " · --utama=" + UTAMA : ""}${UTAMA_GELAP ? " · --utama-gelap=" + UTAMA_GELAP : ""}`);
+// Teks kamus Indonesia yang tidak boleh tersisa di mode Inggris (§16.2):
+// cukup panjang supaya tidak kebetulan muncul di data, berbeda dari
+// padanan Inggrisnya, dan tanpa placeholder.
+const { id: KAMUS_ID, en: KAMUS_EN } = await muatModulFrontend();
+const TEKS_ID_SAJA = Object.keys(KAMUS_ID).filter((k) => KAMUS_ID[k] !== KAMUS_EN[k] && KAMUS_ID[k].length >= 12 && !KAMUS_ID[k].includes("{")).map((k) => KAMUS_ID[k]);
 const HALAMAN = LANGSUNG ? await layarLangsung() : [{ jalur: "/login/", sesi: false }, { jalur: "/akun/", sesi: true }];
+const LEBAR = [1280, 400];
+const MIN_TEKS = 4.5, MIN_BATAS = 3;
+const MIN_ELEMEN = 12;   // halaman yang tidak tergambar tidak boleh lolos karena tak ada yang diukur
 
+let kontrasGagal = 0, kontrasDiperiksa = 0;
+function laporKontras(nama, ok, ket) {
+    kontrasDiperiksa++;
+    if (!ok) kontrasGagal++;
+    if (HARAP_GAGAL) console.log(`  ${ok ? "lolos          " : "GAGAL (diharap)"} ${nama} — ${ket}`);
+    else p.lapor(nama, ok, ket);
+}
 
 // Berjalan di halaman. Latar diambil dari elemen itu sendiri lalu naik ke
 // leluhur sampai ketemu warna legap, dengan lapisan setengah transparan
@@ -150,6 +165,10 @@ try {
             if (utamaGelapRgb) aturan.push(`:root[data-tema="gelap"] { --w-utama: ${utamaGelapRgb}; }`);
             await page.addStyleTag({ content: aturan.join("\n") });
         }
+        if (bahasa === "en") {
+            const sisa = await page.evaluate((daftar) => daftar.filter((s) => document.body.innerText.includes(s)), TEKS_ID_SAJA);
+            p.lapor(`${label}: tidak ada teks kamus Indonesia tersisa`, sisa.length === 0, sisa.slice(0, 3).join(" | "));
+        }
         p.lapor(`${label}: halaman tetap di ${hal.jalur} tanpa galat JS`, new URL(page.url()).pathname === hal.jalur && galat.length === 0, galat.join(" | ") || page.url());
 
         for (const lebar of LEBAR) {
@@ -164,6 +183,19 @@ try {
             laporKontras(`${tag}: kontras batas kendali terburuk ≥ ${MIN_BATAS} (${h.batas.length} kendali)`, h.batas.length > 0 && bb.rasio >= MIN_BATAS, uraikan(bb));
             p.lapor(`${tag}: tidak ada gulir mendatar`, !h.geser, `scrollWidth ${h.lebarGulir} vs clientWidth ${h.lebarTampak}`);
         }
+        await ctx.close();
+    }
+    // Negatif: pendeteksi teks tersisa harus menemukan teks Indonesia pada
+    // halaman yang memang berbahasa Indonesia; kalau tidak, pemeriksaan di
+    // mode Inggris lolos karena pendeteksinya buta.
+    {
+        const ctx = await browser.newContext();
+        const page = await ctx.newPage();
+        await redamFont(page);
+        await pasangApiTiruan(page, penjawabBaku(pengguna(4)));
+        await page.goto(FE + "/login/", { waitUntil: "networkidle" });
+        const sisa = await page.evaluate((daftar) => daftar.filter((s) => document.body.innerText.includes(s)), TEKS_ID_SAJA);
+        p.lapor("negatif: pendeteksi teks kamus Indonesia menemukannya di halaman berbahasa Indonesia", sisa.length > 0, String(sisa.length));
         await ctx.close();
     }
 } catch (e) {

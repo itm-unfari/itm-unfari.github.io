@@ -37,7 +37,6 @@
 
   <section id="kartuImpor" class="kartu p-6" hidden>
     <h2 class="eyebrow text-tinta-redup mb-2" data-i18n="taksonomi.impor_judul"></h2>
-    <p class="text-sm text-tinta-redup mb-4" data-i18n="taksonomi.impor_ket"></p>
     <div id="pesanImpor" hidden role="alert"></div>
     <label for="berkas" class="block text-sm font-medium mb-1.5" data-i18n="taksonomi.pilih_berkas"></label>
     <input id="berkas" type="file" accept=".json,application/json" class="medan">
@@ -103,16 +102,10 @@ if (requireLogin() && requireRole("H-08")) {
         return isNaN(d) ? "" : d.toLocaleDateString(bahasa() === "en" ? "en-GB" : "id-ID");
     }
 
-    // Draf wajib selalu membawa lencana "belum ditelaah" yang mencolok, di
-    // setiap tempat status taksonomi tampil.
+    // Status telaah adalah data yang dikelola HR: tampil netral di riwayat
+    // versi dan pratinjau impor, tanpa peringatan.
     function lencanaTaksonomi(status) {
-        const l = status === "draf"
-            ? lencana(t("taksonomi.draf_belum_ditelaah"), "tinjau")
-            : status === "ditelaah"
-                ? lencana(t("status.taksonomi.ditelaah"), "sah")
-                : lencana(String(status || ""), "netral");
-        l.dataset.uji = "status-taksonomi";
-        return l;
+        return lencana(status === "draf" || status === "ditelaah" ? t("status.taksonomi." + status) : String(status || ""), "netral");
     }
 
     function butirRingkas(wadah, label, isi) {
@@ -145,11 +138,7 @@ if (requireLogin() && requireRole("H-08")) {
         kosongkan(elRingkas);
         const atas = el("div", "flex flex-wrap items-center gap-3");
         atas.appendChild(el("span", "font-data text-2xl font-medium", aktif.versi || ""));
-        atas.appendChild(lencanaTaksonomi(aktif.status));
         elRingkas.appendChild(atas);
-        if (aktif.status === "draf") {
-            elRingkas.appendChild(el("p", "rounded-xl bg-tinjau-muda text-tinjau px-3 py-2 text-sm", t("taksonomi.draf_peringatan")));
-        }
 
         const dl = el("dl", "grid gap-3 grid-cols-2 sm:grid-cols-3 text-sm");
         butirRingkas(dl, t("taksonomi.sumber"), aktif.sumber || "");
@@ -353,7 +342,6 @@ if (requireLogin() && requireRole("H-08")) {
         if (catatan.length > MAKS_CATATAN) {
             elCatatan.appendChild(el("li", "text-tinta-redup", t("taksonomi.cek_lainnya", { n: catatan.length - MAKS_CATATAN })));
         }
-        if (catatan.length) elCatatan.appendChild(el("li", "text-mikro text-tinta-redup", t("taksonomi.cek_ket")));
         btnImpor.disabled = false;
         elPratinjau.hidden = false;
     }
@@ -390,7 +378,6 @@ if (requireLogin() && requireRole("H-08")) {
     btnImpor.addEventListener("click", function () {
         if (!calon) return;
         const aktifkan = chkAktifkan.checked;
-        if (aktifkan && calon.status === "draf" && !window.confirm(t("taksonomi.konfirmasi_aktif_draf"))) return;
         sembunyikan(elPesanImpor);
         btnImpor.disabled = true;
         const badan = Object.assign({}, calon, { aktifkan: aktifkan });

@@ -2,8 +2,11 @@
 
 Situs statis untuk GitHub Pages, bagian dari penelitian fundamental
 *Internal Talent Marketplace (ITM) berbasis AI* di Universitas Al-Ghifari.
-Memanggil backend [`itm-gocroot`](../itm-gocroot) lewat JSON. Seluruh data yang
-tampil sintetis, dan pita "Data sintetis" ada di setiap halaman aplikasi.
+Memanggil backend [`itm-gocroot`](../itm-gocroot) lewat JSON.
+
+Layar hanya memuat yang dibutuhkan untuk bekerja. Catatan internal (konteks riset,
+metodologi, status data dan taksonomi) ada di repo privat `itm-unfari/docs`,
+bukan di halaman; `uji/uji-statis.mjs` dan `uji/uji-alur.mjs` menjaganya.
 
 **Belum di-deploy.** Semua pekerjaan berlangsung di `mubaroqadb-lab`; workflow
 Pages hanya bisa dipicu manual sampai GCP dan domain diputuskan.
@@ -84,7 +87,7 @@ menegakkan izin adalah backend.
 | `404.html` | Halaman tidak ditemukan, disajikan GitHub Pages |
 | `login/` | U-01 Masuk |
 | `akun/` | U-02 Akun saya: identitas, tema, ganti sandi |
-| `assets/css/input.css` | Token warna dua tema dan komponen (`kartu`, `medan`, `tombol-*`, `pita-*`) |
+| `assets/css/input.css` | Token warna dua tema dan komponen (`kartu`, `medan`, `tombol-*`, `pita-atas`) |
 | `assets/css/app.css` | Hasil build, **tidak di-commit** |
 | `assets/js/prapasang.js` | Skrip klasik di `<head>`: tema dan bahasa dari localStorage, `window.itmTampilan` |
 | `assets/js/config.js` | Alamat backend per host dan konstanta `PERAN`. Tidak boleh memuat rahasia |
@@ -92,7 +95,7 @@ menegakkan izin adalah backend.
 | `assets/js/layar.js` | Definisi kode layar: satu sumber untuk nav, mode pakar, P-02, dan tangkapan wireframe |
 | `assets/js/auth.js` | Sesi localStorage, penjaga halaman, `tokenHeader()`, `tujuanSetelahMasuk()` |
 | `assets/js/ui.js` | `el()`, `pesan()`, `sehat()`, `teksGalat()` |
-| `assets/js/nav.js` | Kerangka halaman: pita atas, pita sintetis, kepala, nav per peran, sakelar bahasa dan tema |
+| `assets/js/nav.js` | Kerangka halaman: pita atas, kepala, nav per peran, sakelar bahasa dan tema |
 | `assets/js/jscroot/` | jscroot v0.2.8 di-*vendor*. Jangan disunting |
 | `uji/` | Playwright: `serve.sh`, `package.json`, berkas uji; `tangkapan/` untuk hasil tangkapan layar |
 | `.githooks/` | Hook identitas commit, dipasang lewat `.githooks/pasang.sh` |

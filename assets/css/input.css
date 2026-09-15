@@ -85,11 +85,6 @@
 
     .pita-atas { @apply h-[3px] w-full bg-utama; }
 
-    /* Data sintetis ditandai di layar, bukan hanya di dokumen (§3.7 rencana). */
-    .pita-sintetis {
-        @apply w-full bg-tinjau-muda text-tinjau text-center text-mikro uppercase font-semibold py-1;
-    }
-
     .kode-layar {
         @apply font-data text-mikro rounded-md border border-garis-kendali px-1.5 py-0.5 text-tinta-redup;
     }

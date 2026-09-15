@@ -256,24 +256,12 @@ function tabelSel(audit, daftar, total, totalTampil, label) {
     }
     const frag = el("div", "space-y-2");
     frag.appendChild(wadah);
-    if (!totalTampil) {
-        frag.appendChild(el("p", "text-mikro text-tinta-redup", t("fairness.total_disembunyikan")));
-    }
     return frag;
-}
-
-// catatanAmbang(audit) → HTMLElement: aturan empat-perlima dan penyembunyian.
-export function catatanAmbang(audit) {
-    const a = el("aside", "space-y-1.5 rounded-xl bg-latar px-4 py-3 text-sm text-tinta-redup");
-    a.appendChild(el("p", "", t("fairness.catatan_empat_perlima", { ambang: persenBulat(ambangPenanda(audit)) })));
-    a.appendChild(el("p", "", t("fairness.catatan_ambang_kelompok", { n: audit && audit.ambang_kelompok != null ? audit.ambang_kelompok : "?" })));
-    a.appendChild(el("p", "", t("fairness.catatan_sampel_kecil")));
-    return a;
 }
 
 // renderAudit(wadah, audit) → void
 // Menggambar satu objek audit lengkap (GET /api/fairness/siklus/:id):
-// plot, tabel paritas, tabel tidak ikut, catatan ambang.
+// plot, tabel paritas, tabel tidak ikut.
 export function renderAudit(wadah, audit) {
     kosongkan(wadah);
     const akar = el("div", "space-y-6");
@@ -281,7 +269,6 @@ export function renderAudit(wadah, audit) {
 
     const kepala = el("div", "space-y-1");
     kepala.appendChild(el("h3", "font-medium", t("fairness.judul_plot", { dimensi: t("dimensi." + audit.dimensi) })));
-    kepala.appendChild(el("p", "text-sm text-tinta-redup", t("fairness.ket_rasio")));
     if (audit.dibuat) kepala.appendChild(el("p", "text-mikro text-tinta-redup", t("fairness.dihitung_pada", { tanggal: tanggal(audit.dibuat) })));
     akar.appendChild(kepala);
     akar.appendChild(plotRasio(audit));
@@ -295,13 +282,11 @@ export function renderAudit(wadah, audit) {
 
     const bagTidakIkut = el("section", "space-y-2");
     bagTidakIkut.appendChild(el("h3", "font-medium", t("fairness.judul_tidak_ikut")));
-    bagTidakIkut.appendChild(el("p", "text-sm text-tinta-redup", t("fairness.ket_tidak_ikut")));
     bagTidakIkut.appendChild(tabelSel(audit, audit.tidak_ikut || [], audit.tidak_ikut_total, !!audit.tidak_ikut_total_tampil, {
         k: t("fairness.kolom_tidak_ikut"), tingkat: t("fairness.kolom_tingkat_tidak_ikut"),
     }));
     akar.appendChild(bagTidakIkut);
 
-    akar.appendChild(catatanAmbang(audit));
     wadah.appendChild(akar);
 }
 
@@ -359,7 +344,6 @@ export function keteranganSiklus(siklus) {
     if (tgl) w.appendChild(el("span", "", t("fairness.dijalankan_pada", { tanggal: tgl })));
     if (siklus.bayangan) {
         w.appendChild(lencana(t("fairness.lencana_bayangan"), "netral"));
-        w.appendChild(el("p", "w-full text-mikro", t("fairness.ket_bayangan")));
     }
     return w;
 }

@@ -1,14 +1,16 @@
 # Deploy situs statis ke GitHub Pages.
 #
-# HANYA bisa dipicu manual (workflow_dispatch). GCP dan domain diputuskan
-# setelah pengembangan selesai (§14.2 rencana); sampai saat itu push ke main
-# tidak boleh menerbitkan frontend yang menunjuk backend yang belum ada.
-# Saat keputusan itu diambil: tambahkan pemicu `push: branches: [main]` dan
-# isi PRODUKSI di assets/js/config.js.
+# Sumber Pages repo ini adalah GitHub Actions, bukan cabang main apa adanya:
+# app.css adalah hasil build (di-gitignore), jadi menayangkan cabang langsung
+# memberi halaman tanpa gaya. Setiap push ke main membangun CSS lalu menayangkan.
+# Backend produksi belum ada (§14.2 rencana): PRODUKSI di assets/js/config.js
+# masih kosong, sehingga situs publik tampil tetapi belum bisa dipakai masuk.
 
 name: Deploy ke GitHub Pages
 
 on:
+  push:
+    branches: [main]
   workflow_dispatch:
 
 permissions:

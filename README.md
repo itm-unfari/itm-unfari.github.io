@@ -8,8 +8,11 @@ Layar hanya memuat yang dibutuhkan untuk bekerja. Catatan internal (konteks rise
 metodologi, status data dan taksonomi) ada di repo privat `itm-unfari/docs`,
 bukan di halaman; `uji/uji-statis.mjs` dan `uji/uji-alur.mjs` menjaganya.
 
-**Belum di-deploy.** Semua pekerjaan berlangsung di `mubaroqadb-lab`; workflow
-Pages hanya bisa dipicu manual sampai GCP dan domain diputuskan.
+**Tampil di https://itm-unfari.github.io/, belum bisa dipakai.** Setiap push ke
+`main` membangun `app.css` dan menayangkan situs lewat workflow Actions
+(`.github/workflows/pages.yml`; sumber Pages repo ini = GitHub Actions). Alamat
+backend produksi belum ada sampai GCP dan domain diputuskan, jadi masuk hanya
+berfungsi di `mubaroqadb-lab`.
 
 ## Menjalankan di `mubaroqadb-lab`
 

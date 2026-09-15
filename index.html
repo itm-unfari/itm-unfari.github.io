@@ -1,0 +1,23 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Internal Talent Marketplace</title>
+  <script src="/assets/js/prapasang.js"></script>
+  <link rel="stylesheet" href="/assets/css/app.css">
+</head>
+<body>
+<!-- Akar situs tidak punya halaman: yang bersesi diantar ke layar
+     pertamanya, yang belum ke /login/. Tautan di bawah cadangan bila modul
+     tidak berjalan. -->
+<main class="min-h-screen grid place-items-center p-5">
+  <a href="/login/" class="tombol-halus">Masuk · Sign in</a>
+</main>
+<script type="module">
+import { redirect } from "/assets/js/jscroot/url.js";
+import { getToken, tujuanSetelahMasuk } from "/assets/js/auth.js";
+redirect(getToken() ? tujuanSetelahMasuk() : "/login/");
+</script>
+</body>
+</html>

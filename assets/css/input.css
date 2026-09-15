@@ -1,0 +1,101 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+    /* Nilai tiga angka RGB supaya utilitas bisa memberi alfa. Kontrasnya
+       diukur; ringkasannya di tailwind.config.js. */
+    :root {
+        color-scheme: light;
+        --w-kertas: 255 255 255;
+        --w-latar: 237 242 241;
+        --w-tinta: 14 28 30;
+        --w-tinta-redup: 71 90 92;
+        --w-tinta-samar: 90 109 112;
+        --w-garis: 207 217 216;
+        --w-garis-tipis: 227 234 233;
+        --w-garis-kendali: 107 128 131;
+        --w-utama: 13 107 102;
+        --w-utama-dalam: 9 74 70;
+        --w-utama-muda: 221 239 236;
+        --w-tinjau: 133 87 0;
+        --w-tinjau-muda: 251 239 214;
+        --w-galat: 180 35 42;
+        --w-galat-muda: 251 228 229;
+        --w-sah: 23 116 74;
+        --w-sah-muda: 223 242 231;
+        --w-bayang: 14 28 30;
+        --w-tirai: 14 28 30;
+    }
+    [data-tema="gelap"] {
+        color-scheme: dark;
+        --w-kertas: 20 30 31;
+        --w-latar: 12 19 20;
+        --w-tinta: 228 238 237;
+        --w-tinta-redup: 165 182 181;
+        --w-tinta-samar: 140 158 157;
+        --w-garis: 40 55 56;
+        --w-garis-tipis: 30 42 43;
+        --w-garis-kendali: 95 117 119;
+        --w-utama: 94 196 186;
+        --w-utama-dalam: 140 214 206;
+        --w-utama-muda: 16 50 47;
+        --w-tinjau: 230 176 80;
+        --w-tinjau-muda: 52 38 12;
+        --w-galat: 242 139 144;
+        --w-galat-muda: 63 26 29;
+        --w-sah: 88 201 143;
+        --w-sah-muda: 15 46 30;
+        --w-bayang: 0 0 0;
+        --w-tirai: 0 0 0;
+    }
+
+    html { @apply bg-latar text-tinta font-teks antialiased; }
+    ::selection { @apply bg-utama-muda text-tinta; }
+    ::placeholder { @apply text-tinta-samar; opacity: 1; }
+    :focus-visible { @apply outline-2 outline-offset-2 outline-utama; outline-style: solid; }
+
+    /* Teks dari kamus disembunyikan sampai bahasa pilihan diterapkan, supaya
+       halaman tidak sempat tampil dalam bahasa yang salah. */
+    .i18n-tunggu [data-i18n],
+    .i18n-tunggu [data-i18n-placeholder] { visibility: hidden; }
+}
+
+@layer components {
+    .judul-halaman { @apply font-judul font-semibold tracking-[-0.02em]; }
+    .eyebrow { @apply text-mikro uppercase font-semibold; }
+
+    .kartu { @apply bg-kertas rounded-2xl shadow-kartu; }
+
+    .medan {
+        @apply block w-full rounded-xl border border-garis-kendali bg-kertas px-3 py-2.5 text-sm text-tinta;
+    }
+    .medan:focus { @apply border-utama outline-none ring-2 ring-utama/30; }
+
+    .tombol-utama {
+        @apply inline-flex items-center justify-center gap-2 rounded-full bg-utama px-5 py-2.5
+               text-sm font-semibold text-putih hover:bg-utama-dalam disabled:opacity-60;
+    }
+    [data-tema="gelap"] .tombol-utama { @apply text-latar; }
+
+    .tombol-halus {
+        @apply inline-flex items-center justify-center gap-2 rounded-full border border-garis-kendali
+               px-4 py-2 text-sm font-medium text-tinta hover:bg-latar disabled:opacity-60;
+    }
+
+    .pita-atas { @apply h-[3px] w-full bg-utama; }
+
+    /* Data sintetis ditandai di layar, bukan hanya di dokumen (§3.7 rencana). */
+    .pita-sintetis {
+        @apply w-full bg-tinjau-muda text-tinjau text-center text-mikro uppercase font-semibold py-1;
+    }
+
+    .kode-layar {
+        @apply font-data text-mikro rounded-md border border-garis-kendali px-1.5 py-0.5 text-tinta-redup;
+    }
+
+    .segmen { @apply inline-flex rounded-full border border-garis-kendali p-0.5; }
+    .segmen button { @apply rounded-full px-3 py-1 text-xs font-medium text-tinta-redup; }
+    .segmen button[aria-pressed="true"] { @apply bg-utama text-putih; }
+    [data-tema="gelap"] .segmen button[aria-pressed="true"] { @apply text-latar; }
+}

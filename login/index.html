@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="id" data-judul="masuk.judul_halaman">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Internal Talent Marketplace</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=Plus+Jakarta+Sans:wght@400..700&display=swap" rel="stylesheet">
+  <script src="/assets/js/prapasang.js"></script>
+  <link rel="stylesheet" href="/assets/css/app.css">
+</head>
+<body>
+
+<div class="pita-atas" aria-hidden="true"></div>
+<div class="pita-sintetis" role="note" data-uji="pita-sintetis" data-i18n="aplikasi.pita_sintetis">Data sintetis — bukan data karyawan sungguhan</div>
+
+<div class="min-h-screen grid lg:grid-cols-[1.1fr_1fr]">
+
+  <section class="hidden lg:flex flex-col justify-between p-12 bg-kertas border-r border-garis">
+    <div>
+      <div class="eyebrow text-tinta-redup" data-i18n="aplikasi.lembaga">Penelitian Fundamental · Universitas Al-Ghifari</div>
+      <h1 class="judul-halaman text-4xl mt-3 leading-tight" data-i18n="aplikasi.nama">Internal Talent Marketplace</h1>
+      <p class="text-tinta-redup mt-4 max-w-md" data-i18n="masuk.tagline">Mobilitas internal berbasis skill, dengan fairness yang diukur dan keputusan yang dijelaskan kepada karyawan.</p>
+    </div>
+    <div>
+      <div class="eyebrow text-tinta-redup mb-3" data-i18n="masuk.tiga_layer">Tiga layer</div>
+      <ol class="space-y-2 text-sm">
+        <li class="flex items-center gap-3"><span class="kode-layar">1</span><span data-i18n="masuk.layer_matching">Skills-Matching</span></li>
+        <li class="flex items-center gap-3"><span class="kode-layar">2</span><span data-i18n="masuk.layer_fairness">Fairness</span></li>
+        <li class="flex items-center gap-3"><span class="kode-layar">3</span><span data-i18n="masuk.layer_transparency">Transparency</span></li>
+      </ol>
+    </div>
+  </section>
+
+  <section class="flex items-center justify-center p-6">
+    <div class="w-full max-w-sm">
+      <div class="flex items-center justify-between mb-8">
+        <div class="lg:hidden eyebrow text-tinta-redup" data-i18n="aplikasi.nama">Internal Talent Marketplace</div>
+        <div id="wadahBahasa" class="ml-auto"></div>
+      </div>
+
+      <h2 class="judul-halaman text-xl mb-6" data-i18n="masuk.judul">Masuk</h2>
+
+      <div id="pesan" hidden role="alert"></div>
+
+      <form id="formMasuk" class="space-y-4" novalidate>
+        <div>
+          <label for="uname" class="block text-sm font-medium mb-1.5" data-i18n="masuk.uname">Nama pengguna</label>
+          <input id="uname" name="uname" type="text" class="medan font-data" required
+                 autofocus autocomplete="username" spellcheck="false">
+        </div>
+        <div>
+          <label for="password" class="block text-sm font-medium mb-1.5" data-i18n="masuk.sandi">Sandi</label>
+          <input id="password" name="password" type="password" class="medan" required autocomplete="current-password">
+        </div>
+        <button type="submit" id="tombolMasuk" class="tombol-utama w-full" data-i18n="masuk.tombol">Masuk</button>
+      </form>
+    </div>
+  </section>
+</div>
+
+<script type="module">
+import { postJSON } from "/assets/js/jscroot/api.js";
+import { redirect } from "/assets/js/jscroot/url.js";
+import { backend } from "/assets/js/config.js";
+import { requireGuest, setSession, tujuanSetelahMasuk } from "/assets/js/auth.js";
+import { pesan, sembunyikan, sehat } from "/assets/js/ui.js";
+import { t, terapkan } from "/assets/js/i18n.js";
+import { sakelarBahasa } from "/assets/js/nav.js";
+
+if (requireGuest()) {
+    document.getElementById("wadahBahasa").appendChild(sakelarBahasa());
+    terapkan();
+
+    const form = document.getElementById("formMasuk");
+    const tombol = document.getElementById("tombolMasuk");
+    const elPesan = document.getElementById("pesan");
+
+    form.addEventListener("submit", function (e) {
+        e.preventDefault();
+        sembunyikan(elPesan);
+        tombol.disabled = true;
+        tombol.textContent = t("umum.memproses");
+        postJSON(backend.auth.login, {
+            uname: document.getElementById("uname").value.trim(),
+            password: document.getElementById("password").value,
+        }, jawabanMasuk);
+    });
+
+    function jawabanMasuk(hasil) {
+        tombol.disabled = false;
+        tombol.textContent = t("masuk.tombol");
+        if (!sehat(hasil, elPesan)) return;
+        const isi = (hasil.data && hasil.data.data) || {};
+        if (!isi.token) {
+            pesan(elPesan, t("galat.jawaban_tak_dikenal"), "galat");
+            return;
+        }
+        setSession(isi.token, isi.user);
+        redirect(tujuanSetelahMasuk());
+    }
+}
+</script>
+</body>
+</html>

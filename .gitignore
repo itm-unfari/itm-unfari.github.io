@@ -1,0 +1,9 @@
+node_modules/
+uji/node_modules/
+# Hasil build; GitHub Actions membangunnya ulang tiap deploy.
+assets/css/app.css
+# Jejak server statis uji/serve.sh dan tangkapan layar Playwright.
+uji/.serve.pid
+uji/.serve.log
+uji/tangkapan/
+.DS_Store

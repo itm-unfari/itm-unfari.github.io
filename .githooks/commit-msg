@@ -1,0 +1,8 @@
+#!/bin/bash
+source "$(dirname "$0")/aturan.sh"
+
+if pesan_bertrailer_ai < "$1"; then
+    echo "DITOLAK commit-msg: pesan commit memuat trailer atribusi AI." >&2
+    echo "Hapus baris Co-Authored-By/Generated with yang menyebut Claude/Anthropic." >&2
+    exit 1
+fi

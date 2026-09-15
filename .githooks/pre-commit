@@ -1,0 +1,15 @@
+#!/bin/bash
+source "$(dirname "$0")/aturan.sh"
+
+# Identitas efektif, termasuk yang dipaksa lewat GIT_AUTHOR_*/GIT_COMMITTER_*.
+author=$(git var GIT_AUTHOR_IDENT | sed -E 's/ [0-9]+ [+-][0-9]{4}$//')
+committer=$(git var GIT_COMMITTER_IDENT | sed -E 's/ [0-9]+ [+-][0-9]{4}$//')
+harap="$ITM_NAMA <$ITM_EMAIL>"
+
+if [ "$author" != "$harap" ] || [ "$committer" != "$harap" ]; then
+    echo "DITOLAK pre-commit: identitas commit harus '$harap'." >&2
+    echo "  author   : $author" >&2
+    echo "  committer: $committer" >&2
+    echo "Jalankan .githooks/pasang.sh di repo ini." >&2
+    exit 1
+fi

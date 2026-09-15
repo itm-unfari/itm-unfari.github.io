@@ -1,0 +1,19 @@
+{
+    "name": "itm-frontend-uji",
+    "version": "0.1.0",
+    "private": true,
+    "description": "Uji Playwright frontend ITM. Dijalankan di mubaroqadb-lab terhadap situs statis di porta 5180.",
+    "scripts": {
+        "kamus": "node uji-kamus.mjs",
+        "tiruan": "node uji-tiruan.mjs",
+        "langsung": "node uji-langsung.mjs",
+        "mutu": "node uji-mutu.mjs",
+        "mutu:negatif": "node uji-mutu.mjs --harap-gagal",
+        "tangkap": "node tangkap-layar.mjs",
+        "semua": "node uji-kamus.mjs && node uji-tiruan.mjs && node uji-langsung.mjs && node uji-mutu.mjs && node uji-mutu.mjs --harap-gagal"
+    },
+    "devDependencies": {
+        "playwright": "1.63.0"
+    },
+    "type": "module"
+}

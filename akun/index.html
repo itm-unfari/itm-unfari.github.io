@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="id" data-judul="akun.judul_halaman">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Internal Talent Marketplace</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=Plus+Jakarta+Sans:wght@400..700&display=swap" rel="stylesheet">
+  <script src="/assets/js/prapasang.js"></script>
+  <link rel="stylesheet" href="/assets/css/app.css">
+</head>
+<body>
+
+<main class="mx-auto max-w-3xl px-5 py-6 space-y-5">
+  <div id="pesan" hidden role="alert"></div>
+
+  <section class="kartu p-6">
+    <h2 class="eyebrow text-tinta-redup mb-4" data-i18n="akun.identitas">Identitas</h2>
+    <dl class="grid grid-cols-[10rem_1fr] gap-y-2 text-sm">
+      <dt class="text-tinta-redup" data-i18n="akun.nama_pengguna">Nama pengguna</dt>
+      <dd id="uname" class="font-data"></dd>
+      <dt class="text-tinta-redup" data-i18n="akun.peran">Peran</dt>
+      <dd id="peran"></dd>
+    </dl>
+  </section>
+
+  <section class="kartu p-6">
+    <h2 class="eyebrow text-tinta-redup mb-4" data-i18n="akun.tampilan">Tampilan</h2>
+    <div id="wadahTema"></div>
+  </section>
+
+  <section class="kartu p-6">
+    <h2 class="eyebrow text-tinta-redup mb-4" data-i18n="akun.ganti_sandi">Ganti sandi</h2>
+    <div id="pesanSandi" hidden role="alert"></div>
+    <form id="formSandi" class="space-y-4 max-w-sm" novalidate>
+      <div>
+        <label for="lama" class="block text-sm font-medium mb-1.5" data-i18n="akun.sandi_lama">Sandi lama</label>
+        <input id="lama" type="password" class="medan" autocomplete="current-password" required>
+      </div>
+      <div>
+        <label for="baru" class="block text-sm font-medium mb-1.5" data-i18n="akun.sandi_baru">Sandi baru</label>
+        <input id="baru" type="password" class="medan" autocomplete="new-password" minlength="8" required>
+      </div>
+      <div>
+        <label for="ulang" class="block text-sm font-medium mb-1.5" data-i18n="akun.sandi_baru_ulang">Ulangi sandi baru</label>
+        <input id="ulang" type="password" class="medan" autocomplete="new-password" minlength="8" required>
+      </div>
+      <button type="submit" id="tombolSandi" class="tombol-utama" data-i18n="umum.simpan">Simpan</button>
+    </form>
+  </section>
+</main>
+
+<script type="module">
+import { getJSON, postJSON } from "/assets/js/jscroot/api.js";
+import { backend } from "/assets/js/config.js";
+import { requireLogin, tokenHeader } from "/assets/js/auth.js";
+import { pesan, sembunyikan, sehat } from "/assets/js/ui.js";
+import { t } from "/assets/js/i18n.js";
+import { pasang, sakelarTema } from "/assets/js/nav.js";
+
+if (requireLogin()) {
+    pasang("U-02");
+    document.getElementById("wadahTema").appendChild(sakelarTema());
+    const elPesan = document.getElementById("pesan");
+
+    getJSON(backend.auth.me, function (hasil) {
+        if (!sehat(hasil, elPesan)) return;
+        const u = hasil.data.data || {};
+        document.getElementById("uname").textContent = u.uname || "";
+        document.getElementById("peran").textContent = t("peran." + u.role);
+    }, ...tokenHeader());
+
+    const form = document.getElementById("formSandi");
+    const tombol = document.getElementById("tombolSandi");
+    const elSandi = document.getElementById("pesanSandi");
+    form.addEventListener("submit", function (e) {
+        e.preventDefault();
+        sembunyikan(elSandi);
+        const lama = document.getElementById("lama").value;
+        const baru = document.getElementById("baru").value;
+        if (baru !== document.getElementById("ulang").value) {
+            pesan(elSandi, t("akun.sandi_tidak_sama"), "galat");
+            return;
+        }
+        tombol.disabled = true;
+        postJSON(backend.auth.sandi, { lama: lama, baru: baru }, function (hasil) {
+            tombol.disabled = false;
+            if (!sehat(hasil, elSandi)) return;
+            form.reset();
+            pesan(elSandi, t("akun.sandi_berhasil"), "sah");
+        }, ...tokenHeader());
+    });
+}
+</script>
+</body>
+</html>

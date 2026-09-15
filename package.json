@@ -1,0 +1,14 @@
+{
+    "name": "itm-frontend",
+    "version": "0.1.0",
+    "private": true,
+    "description": "Frontend statis Internal Talent Marketplace (itm-unfari). Tailwind dikompilasi ke satu app.css.",
+    "scripts": {
+        "build": "tailwindcss -i ./assets/css/input.css -o ./assets/css/app.css --minify",
+        "watch:css": "tailwindcss -i ./assets/css/input.css -o ./assets/css/app.css --watch",
+        "serve": "python3 -m http.server 5180 --bind 0.0.0.0"
+    },
+    "devDependencies": {
+        "tailwindcss": "3.4.13"
+    }
+}

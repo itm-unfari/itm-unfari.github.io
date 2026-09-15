@@ -1,0 +1,30 @@
+#!/bin/bash
+# Jaring terakhir: memeriksa SETIAP commit yang akan dikirim, termasuk commit
+# yang lahir tanpa melewati hook lain (rebase, cherry-pick, commit-tree).
+source "$(dirname "$0")/aturan.sh"
+
+nol=0000000000000000000000000000000000000000
+harap="$ITM_NAMA|$ITM_EMAIL|$ITM_NAMA|$ITM_EMAIL"
+gagal=0
+
+while read -r _ lokal _ jauh; do
+    [ "$lokal" = "$nol" ] && continue
+    if [ "$jauh" = "$nol" ]; then
+        rentang=$(git rev-list "$lokal" --not --remotes)
+    else
+        rentang=$(git rev-list "$jauh..$lokal")
+    fi
+    for c in $rentang; do
+        id=$(git log -1 --format='%an|%ae|%cn|%ce' "$c")
+        if [ "$id" != "$harap" ]; then
+            echo "DITOLAK pre-push: commit $c beridentitas '$id'." >&2
+            gagal=1
+        fi
+        if git log -1 --format=%B "$c" | pesan_bertrailer_ai; then
+            echo "DITOLAK pre-push: commit $c memuat trailer atribusi AI." >&2
+            gagal=1
+        fi
+    done
+done
+
+exit $gagal

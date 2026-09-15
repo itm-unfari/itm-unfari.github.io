@@ -153,8 +153,72 @@ export async function pasangSesi(page, user, token = "token-uji") {
 
 export const jalurDari = (url) => new URL(url).pathname;
 
+// ── backend sungguhan ──
+
+// masukApi masuk langsung ke backend (tanpa peramban) dan mengembalikan
+// {token, user}; dipakai uji langsung untuk menyiapkan sesi dan mencari id.
+export async function masukApi(uname, sandi = SANDI_UJI) {
+    const r = await fetch(API + "/auth/login", {
+        method: "POST", headers: { "content-type": "application/json" },
+        body: JSON.stringify({ uname, password: sandi }),
+    });
+    const j = await r.json().catch(() => ({}));
+    if (!r.ok || !j.data || !j.data.token) throw new Error(`masuk ${uname} gagal: HTTP ${r.status} ${j.code || ""}`);
+    return j.data;
+}
+
+export async function apiJSON(token, jalur, badan) {
+    const r = await fetch(API + jalur, {
+        method: badan === undefined ? "GET" : "POST",
+        headers: { "content-type": "application/json", login: token },
+        body: badan === undefined ? undefined : JSON.stringify(badan),
+    });
+    const j = await r.json().catch(() => ({}));
+    // http terpisah dari status amplop ("ok"/"error"), yang bernama sama.
+    return { ...j, http: r.status };
+}
+
+// jalankanPekerjaAI memproses antrean tugas AI sekali (tools/pekerja-ai di
+// repo backend). Repo backend dianggap bersebelahan dengan repo ini kecuali
+// BACKEND_REPO diatur.
+export async function jalankanPekerjaAI() {
+    const { spawn } = await import("node:child_process");
+    const path = await import("node:path");
+    const repo = process.env.BACKEND_REPO || path.resolve(import.meta.dirname, "..", "..", "itm-gocroot");
+    return new Promise((ok, gagal) => {
+        const p = spawn("go", ["run", "./tools/pekerja-ai"], { cwd: repo, stdio: "ignore" });
+        p.on("error", gagal);
+        p.on("exit", (kode) => (kode === 0 ? ok() : gagal(new Error("pekerja-ai keluar " + kode))));
+    });
+}
+
 // opsiPeluncur: PW_CHANNEL=chrome memakai Chrome sistem bila Chromium
 // bawaan Playwright belum diunduh (npx playwright install chromium).
 export function opsiPeluncur() {
     return process.env.PW_CHANNEL ? { channel: process.env.PW_CHANNEL } : {};
+}
+
+// layarLangsung menyiapkan setiap layar tersedia untuk dibuka dengan data
+// backend sungguhan: peran utamanya (peran pertama di layar.js; U-02 sebagai
+// karyawan) atau peranPaksa, sesi dari /auth/login, dan parameter id yang
+// dicari dari backend untuk layar yang dibuka dari layar lain. Layar yang
+// tidak boleh dibuka peranPaksa tidak disertakan.
+export async function layarLangsung(peranPaksa) {
+    const { LAYAR, PERAN } = await muatModulFrontend();
+    const akun = { 1: "uji.admin", 2: "uji.hr", 3: "uji.manajer", 4: "uji.karyawan", 5: "uji.auditor", 6: "uji.pakar" };
+    const sesi = {};
+    for (const r of Object.keys(akun)) sesi[r] = await masukApi(akun[r]);
+    const rekom = (await apiJSON(sesi[PERAN.KARYAWAN].token, "/api/saya/rekomendasi")).data || {};
+    const m = (rekom.match || [])[0] || {};
+    const peluangManajer = ((await apiJSON(sesi[PERAN.MANAJER].token, "/api/peluang?status=terbuka")).data || [])[0] || {};
+    const param = {
+        "K-03": peranPaksa === PERAN.PAKAR ? "?karyawan_id=" + encodeURIComponent(m.karyawan_id || "") : "",
+        "K-04": "?id=" + encodeURIComponent(m.id || ""),
+        "H-02": "?id=" + encodeURIComponent(m.id || ""),
+        "M-02": "?peluang=" + encodeURIComponent(peluangManajer.id || ""),
+    };
+    return LAYAR.filter((l) => l.tersedia && (!peranPaksa || l.kode === "U-01" || l.peran.includes(peranPaksa))).map((l) => {
+        const peran = peranPaksa || (l.kode === "U-02" ? PERAN.KARYAWAN : l.peran[0]);
+        return { kode: l.kode, jalur: l.url, query: param[l.kode] || "", sesi: l.kode !== "U-01", peran, u: sesi[peran].user, token: sesi[peran].token };
+    });
 }

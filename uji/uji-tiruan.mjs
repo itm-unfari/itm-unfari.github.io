@@ -8,7 +8,7 @@
 import { chromium } from "playwright";
 import {
     FE, SANDI_UJI, pelapor, muatModulFrontend, pasangApiTiruan, penjawabBaku,
-    amplopGalat, pengguna, pasangSesi, redamFont, jalurDari, opsiPeluncur,
+    amplopOk, amplopGalat, pengguna, pasangSesi, redamFont, jalurDari, opsiPeluncur,
 } from "./bantu.mjs";
 
 const p = pelapor("API TIRUAN — " + FE);
@@ -349,6 +349,61 @@ try {
         p.lapor(`peran ${role}: pita data sintetis ada`, await page.locator('[data-uji="pita-sintetis"]').isVisible());
         tanpaGalat(`peran ${role}`, galat);
         await ctx.close();
+    }
+
+    // ── 11. XSS pada data talenta (§16.2): nama skill, judul peluang, kutipan usulan AI ──
+    //
+    // Kutipan AI tidak bisa disuntikkan lewat adaptor rekaman backend, jadi
+    // seluruh balasan di sini tiruan yang sengaja memuat <img onerror>. Setiap
+    // layar yang menampilkan ketiga jenis data itu harus menampilkannya sebagai
+    // teks, tanpa satu pun elemen <img>.
+    {
+        const X = (s) => XSS + s;
+        const kontribusi = [{ kode: "DAT-01", tingkat_dibutuhkan: 2, tingkat_dimiliki: 2, bobot: 1, pengali: 1, bobot_efektif: 100, kecocokan: 0.5, sumbangan: 50, gap: 50 }];
+        const match = { id: "m1", siklus_id: "s1", karyawan_id: "k1", peluang_id: "p1", aturan_id: "atr-v1", skor: 50, peringkat: 1, direkomendasikan: true, kontribusi, snapshot_profil: [{ kode: "DAT-01", tingkat: 2 }], status: "direkomendasikan", riwayat_status: [], dibuat: "2026-09-01T00:00:00Z" };
+        const peluang = { id: "p1", jenis: "proyek", judul: X("Judul peluang"), deskripsi: X("Deskripsi"), bahasa_deskripsi: "id", unit: X("Unit"), skill_dibutuhkan: [{ kode: "DAT-01", tingkat: 2, bobot: 1 }], status: "terbuka", dibuat: "2026-09-01T00:00:00Z" };
+        const butir = [{ kode: "DAT-01", tingkat_perkiraan: 2, kutipan: X("kutipan usulan AI"), posisi_mulai: 0, posisi_selesai: 3, status: "usulan" }];
+        const halamanPenuh = (data) => ({ status: 200, body: { status: "ok", data, meta: { page: 1, limit: 50, total: data.length, total_pages: 1, sintetis: true } } });
+        const ok = (data) => ({ status: 200, body: amplopOk(data) });
+        const tambahan = {
+            "/api/skill": () => ok({ versi: "v0", status: "draf", sumber: X("sumber"), kelompok: [{ kode: "DAT", nama: { id: X("Kelompok"), en: X("Group") } }], skill: [{ kode: "DAT-01", kelompok: "DAT", nama: { id: X("Nama skill"), en: X("Skill name") }, deskripsi: { id: X("d"), en: X("d") }, versi: "v0" }], tingkat: {} }),
+            "/api/saya/profil": () => ok({ karyawan: { id: "k1", nama: X("Nama"), unit: X("Unit"), jabatan: X("Jabatan"), terbuka: true }, profil_skill: [{ id: "ps1", kode: "DAT-01", tingkat: 2, sumber_bukti: "usulan_ai", tanggal: "2026-09-01T00:00:00Z" }] }),
+            "/api/saya/usulan-skill": () => halamanPenuh([{ id: "u1", sumber_jenis: "profil", sumber_id: "k1", butir, dibuat: "2026-09-01T00:00:00Z" }]),
+            "/api/saya/rekomendasi": () => ok({ siklus: { id: "s1", nama: X("Siklus") }, match: [Object.assign({}, match, { peluang: { id: "p1", judul: peluang.judul, jenis: "proyek", unit: peluang.unit } })] }),
+            "/api/match/m1": () => ok({ match, peluang, karyawan: { id: "k1", nama: X("Nama"), unit: X("Unit"), jabatan: X("Jabatan") }, aturan: { id: "atr-v1", versi: 1, asal: "manual" }, skill: { "DAT-01": { nama: { id: X("Nama skill"), en: X("Skill name") }, kelompok: "DAT" } } }),
+            "/api/kondisi-batas": () => ok({ id: "kb1", versi: 1, pernyataan: [{ dimensi: "D1", bahasa: "id", teks: X("kondisi") }], aktif: true }),
+            "/api/peluang": () => halamanPenuh([peluang]),
+            "/api/peluang/p1": () => ok(peluang),
+            "/api/peluang/p1/usulan-skill": () => halamanPenuh([{ id: "u2", sumber_jenis: "peluang", sumber_id: "p1", butir, dibuat: "2026-09-01T00:00:00Z" }]),
+            "/api/peluang/p1/kandidat": () => ok({ siklus: { id: "s1", nama: X("Siklus"), status: "dijalankan" }, peluang, kandidat: [Object.assign({}, match, { karyawan: { id: "k1", nama: X("Nama"), unit: X("Unit"), jabatan: X("Jabatan") } })] }),
+            "/api/grafik-skill": () => halamanPenuh([{ id: "t1", skill_a: "DAT-01", skill_b: "DAT-01", kemiripan: 0.9, lintas_kelompok: true, model_embedding: X("model"), versi_taksonomi: "v0", status: "usulan", dibuat: "2026-09-01T00:00:00Z" }]),
+        };
+        const kasus = [
+            { peran: 4, jalur: "/profil/" },
+            { peran: 4, jalur: "/usulan-skill/" },
+            { peran: 4, jalur: "/rekomendasi/" },
+            { peran: 4, jalur: "/penjelasan/?id=m1" },
+            { peran: 2, jalur: "/detail-kandidat/?id=m1" },
+            { peran: 2, jalur: "/peluang/", buka: true },
+            { peran: 3, jalur: "/kandidat/?peluang=p1" },
+            { peran: 2, jalur: "/grafik-skill/" },
+        ];
+        for (const k of kasus) {
+            const { ctx, page, galat } = await halamanBaru();
+            const u = pengguna(k.peran);
+            await pasangApiTiruan(page, Object.assign(penjawabBaku(u), tambahan));
+            await pasangSesi(page, u);
+            await page.goto(FE + k.jalur, { waitUntil: "networkidle" });
+            await page.waitForTimeout(600);
+            if (k.buka) {
+                await page.locator("main button").filter({ hasText: new RegExp(`^(${id["peluang.kelola"]}|${id["umum.detail"]})$`) }).first().click();
+                await page.waitForTimeout(800);
+            }
+            const r = await page.evaluate(() => ({ img: document.querySelectorAll("img").length, xss: !!window.__xss, teks: document.body.textContent.includes("<img src=x") }));
+            p.lapor(`XSS ${k.jalur} (peran ${k.peran}): data ber-HTML tampil sebagai teks, tanpa <img>`, r.img === 0 && !r.xss && r.teks, JSON.stringify(r));
+            tanpaGalat(`XSS ${k.jalur}`, galat);
+            await ctx.close();
+        }
     }
 } catch (e) {
     p.lapor("berjalan tanpa galat tak terduga", false, String(e && e.stack || e));

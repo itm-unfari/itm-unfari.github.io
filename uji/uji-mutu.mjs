@@ -8,14 +8,18 @@
 //   node uji-mutu.mjs --harap-gagal      uji negatif: --utama=B8E0DC HARUS
 //                                        menggagalkan setidaknya satu
 //                                        pemeriksaan kontras
+//   node uji-mutu.mjs --langsung         SELURUH layar tersedia dengan data
+//                                        backend sungguhan (8095), tiap layar
+//                                        dibuka peran utamanya
 import { chromium } from "playwright";
-import { FE, pelapor, pasangApiTiruan, penjawabBaku, pengguna, redamFont, opsiPeluncur } from "./bantu.mjs";
+import { FE, pelapor, pasangApiTiruan, penjawabBaku, pengguna, redamFont, opsiPeluncur, layarLangsung } from "./bantu.mjs";
 
 const arg = Object.fromEntries(process.argv.slice(2).map((a) => {
     const m = a.match(/^--([^=]+)(?:=(.*))?$/);
     return m ? [m[1], m[2] === undefined ? true : m[2]] : [a, true];
 }));
 const HARAP_GAGAL = arg["harap-gagal"] === true;
+const LANGSUNG = arg.langsung === true;
 // --utama menimpa --w-utama tema TERANG; --utama-gelap untuk tema gelap.
 // Dipisah karena tema gelap memakai teks gelap di atas utama yang terang:
 // satu warna organisasi untuk kedua tema hampir pasti gagal di salah satunya.
@@ -29,18 +33,8 @@ const keRgb = (h) => (h ? [0, 2, 4].map((i) => parseInt(h.slice(i, i + 2), 16)).
 const utamaRgb = keRgb(UTAMA), utamaGelapRgb = keRgb(UTAMA_GELAP);
 
 const p = pelapor(HARAP_GAGAL ? `MUTU — uji negatif: --utama=${UTAMA} harus menggagalkan kontras` : `MUTU — ${FE}${UTAMA ? " · --utama=" + UTAMA : ""}${UTAMA_GELAP ? " · --utama-gelap=" + UTAMA_GELAP : ""}`);
-const HALAMAN = [{ jalur: "/login/", sesi: false }, { jalur: "/akun/", sesi: true }];
-const LEBAR = [1280, 400];
-const MIN_TEKS = 4.5, MIN_BATAS = 3;
-const MIN_ELEMEN = 12;   // halaman yang tidak tergambar tidak boleh lolos karena tak ada yang diukur
+const HALAMAN = LANGSUNG ? await layarLangsung() : [{ jalur: "/login/", sesi: false }, { jalur: "/akun/", sesi: true }];
 
-let kontrasGagal = 0, kontrasDiperiksa = 0;
-function laporKontras(nama, ok, ket) {
-    kontrasDiperiksa++;
-    if (!ok) kontrasGagal++;
-    if (HARAP_GAGAL) console.log(`  ${ok ? "lolos          " : "GAGAL (diharap)"} ${nama} — ${ket}`);
-    else p.lapor(nama, ok, ket);
-}
 
 // Berjalan di halaman. Latar diambil dari elemen itu sendiri lalu naik ke
 // leluhur sampai ketemu warna legap, dengan lapisan setengah transparan
@@ -130,23 +124,24 @@ const uraikan = (x) => `${x.rasio}:1 pada ${x.nama} (fg ${x.fg} / bg ${x.bg})`;
 const browser = await chromium.launch(opsiPeluncur());
 try {
     for (const hal of HALAMAN) for (const tema of ["terang", "gelap"]) for (const bahasa of ["id", "en"]) {
-        const label = `${hal.jalur} · ${tema} · ${bahasa}`;
+        const label = `${hal.kode ? hal.kode + " " : ""}${hal.jalur} · ${tema} · ${bahasa}`;
         const ctx = await browser.newContext({ viewport: { width: LEBAR[0], height: 800 } });
         // Sesi lewat init script tidak apa-apa di sini: tidak ada skenario
         // pengalihan, jadi penanaman ulang tidak mengganggu.
-        await ctx.addInitScript(({ tema, bahasa, sesi, u }) => {
+        await ctx.addInitScript(({ tema, bahasa, sesi, u, token }) => {
             localStorage.setItem("itm_tema", tema);
             localStorage.setItem("itm_bahasa", bahasa);
-            if (sesi) { localStorage.setItem("itm_token", "token-uji"); localStorage.setItem("itm_user", JSON.stringify(u)); }
-        }, { tema, bahasa, sesi: hal.sesi, u: pengguna(4) });
+            if (sesi) { localStorage.setItem("itm_token", token); localStorage.setItem("itm_user", JSON.stringify(u)); }
+        }, { tema, bahasa, sesi: hal.sesi, u: hal.u || pengguna(4), token: hal.token || "token-uji" });
         const page = await ctx.newPage();
         const galat = [];
         page.on("pageerror", (e) => galat.push(e.message));
         await redamFont(page);
-        await pasangApiTiruan(page, penjawabBaku(pengguna(4)));
-        await page.goto(FE + hal.jalur, { waitUntil: "networkidle" });
+        if (!LANGSUNG) await pasangApiTiruan(page, penjawabBaku(pengguna(4)));
+        await page.goto(FE + hal.jalur + (hal.query || ""), { waitUntil: "networkidle" });
         await page.waitForFunction(() => !document.documentElement.classList.contains("i18n-tunggu"), null, { timeout: 8000 }).catch(() => {});
-        if (hal.sesi) await page.waitForFunction(() => document.getElementById("uname").textContent.length > 0, null, { timeout: 8000 }).catch(() => {});
+        if (hal.jalur === "/akun/") await page.waitForFunction(() => document.getElementById("uname").textContent.length > 0, null, { timeout: 8000 }).catch(() => {});
+        if (LANGSUNG) await page.waitForTimeout(1200);
         if (utamaRgb || utamaGelapRgb) {
             // Dipasang SETELAH muat. Spesifisitas (0,2,0) mengalahkan kedua
             // definisi (0,1,0) di input.css tanpa saling menimpa antar tema.

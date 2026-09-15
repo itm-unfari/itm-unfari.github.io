@@ -5,12 +5,17 @@
     "description": "Uji Playwright frontend ITM. Dijalankan di mubaroqadb-lab terhadap situs statis di porta 5180.",
     "scripts": {
         "kamus": "node uji-kamus.mjs",
+        "statis": "node uji-statis.mjs",
         "tiruan": "node uji-tiruan.mjs",
         "langsung": "node uji-langsung.mjs",
+        "alur": "node uji-alur.mjs",
         "mutu": "node uji-mutu.mjs",
         "mutu:negatif": "node uji-mutu.mjs --harap-gagal",
-        "tangkap": "node tangkap-layar.mjs",
-        "semua": "node uji-kamus.mjs && node uji-tiruan.mjs && node uji-langsung.mjs && node uji-mutu.mjs && node uji-mutu.mjs --harap-gagal"
+        "mutu:langsung": "node uji-mutu.mjs --langsung",
+        "demo": "node siapkan-demo.mjs",
+        "tangkap": "node tangkap-layar.mjs --langsung",
+        "tangkap:pakar": "PERAN=6 node tangkap-layar.mjs --langsung",
+        "semua": "node uji-kamus.mjs && node uji-statis.mjs && node uji-tiruan.mjs && node uji-langsung.mjs && node uji-alur.mjs && node uji-mutu.mjs && node uji-mutu.mjs --harap-gagal && node uji-mutu.mjs --langsung"
     },
     "devDependencies": {
         "playwright": "1.63.0"

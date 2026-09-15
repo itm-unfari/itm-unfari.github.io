@@ -10,7 +10,7 @@ import { chromium } from "playwright";
 import { FE, API, SANDI_UJI, pelapor, muatModulFrontend, redamFont, jalurDari, opsiPeluncur } from "./bantu.mjs";
 
 const p = pelapor(`LANGSUNG — ${FE} → ${API}`);
-const { id } = await muatModulFrontend();
+const { id, layarUntuk } = await muatModulFrontend();
 const AKUN = "uji.karyawan";
 const SANDI_SEMENTARA = "ujilokal123-sementara";   // ≥ 8 karakter dan ≠ sandi lama (syarat backend)
 
@@ -54,14 +54,17 @@ async function masuk(uname, sandi) {
     await page.fill("#uname", uname);
     await page.fill("#password", sandi);
     await page.click("#tombolMasuk");
-    // Selesai bila sudah di /akun/ ATAU pesan galat tampil di /login/.
-    await page.waitForFunction(() => location.pathname.startsWith("/akun")
+    // Selesai bila sudah meninggalkan /login/ ATAU pesan galat tampil di sana.
+    await page.waitForFunction(() => !location.pathname.startsWith("/login")
         || (document.getElementById("pesan") && !document.getElementById("pesan").hidden), null, { timeout: 15000 }).catch(() => {});
-    if (jalurDari(page.url()) !== "/akun/") await page.waitForURL("**/akun/**", { timeout: 3000 }).catch(() => {});
-    if (jalurDari(page.url()) === "/akun/") {
+    const mendarat = jalurDari(page.url());
+    // Pemeriksaan identitas dan ganti sandi ada di U-02; layar pendaratan
+    // tiap peran dibaca dari layar.js dan diperiksa terpisah.
+    if (mendarat !== "/login/") {
+        await page.goto(FE + "/akun/", { waitUntil: "networkidle" });
         await page.waitForFunction(() => document.getElementById("uname").textContent.length > 0, null, { timeout: 10000 }).catch(() => {});
     }
-    return { ctx, page, galat };
+    return { ctx, page, galat, mendarat };
 }
 const tanpaGalat = (nama, galat) => p.lapor(`${nama}: tanpa galat JavaScript`, galat.length === 0, galat.join(" | "));
 const bacaSesi = (page) => page.evaluate(() => ({ token: localStorage.getItem("itm_token"), user: localStorage.getItem("itm_user") }));
@@ -85,8 +88,9 @@ async function kirimSandi(page, lama, baru, ulang) {
 try {
     // ── A. Masuk sebagai karyawan, lalu Keluar ──
     {
-        const { ctx, page, galat } = await masuk(AKUN, SANDI_UJI);
-        p.lapor(`masuk ${AKUN} sampai di /akun/`, jalurDari(page.url()) === "/akun/", page.url());
+        const { ctx, page, galat, mendarat } = await masuk(AKUN, SANDI_UJI);
+        const harap = (layarUntuk(4).find((l) => l.kode !== "U-02") || { url: "/akun/" }).url;
+        p.lapor(`masuk ${AKUN} mendarat di layar pertama perannya (${harap})`, mendarat === harap, mendarat);
         p.lapor("uname tampil dari /auth/me", (await page.locator("#uname").textContent()) === AKUN);
         p.lapor("peran tampil dari kamus (peran.4)", (await page.locator("#peran").textContent()) === id["peran.4"]);
         p.lapor("nama tampil di kepala halaman", ((await page.locator("header").textContent()) || "").includes("Uji Karyawan"));

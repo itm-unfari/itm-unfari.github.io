@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html lang="id" data-judul="auditFairness.judul_halaman">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Internal Talent Marketplace</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=Plus+Jakarta+Sans:wght@400..700&display=swap" rel="stylesheet">
+  <script src="/assets/js/prapasang.js"></script>
+  <link rel="stylesheet" href="/assets/css/app.css">
+</head>
+<body>
+
+<main class="mx-auto max-w-4xl px-5 py-6 space-y-5">
+  <div id="pesan" hidden role="alert"></div>
+
+  <section class="kartu p-6">
+    <h2 class="eyebrow text-tinta-redup mb-2" data-i18n="auditFairness.pilihan">Pilih siklus dan atribut</h2>
+    <p class="text-sm text-tinta-redup mb-4" data-i18n="auditFairness.ket">Hanya angka agregat per kelompok; tidak ada data perorangan di layar ini.</p>
+    <form id="formPilihan" class="grid gap-4 sm:grid-cols-3" novalidate>
+      <div class="sm:col-span-3">
+        <label for="selSiklus" class="block text-sm font-medium mb-1.5" data-i18n="auditFairness.label_siklus">Siklus</label>
+        <select id="selSiklus" class="medan"></select>
+      </div>
+      <div class="sm:col-span-2">
+        <label for="selDimensi" class="block text-sm font-medium mb-1.5" data-i18n="auditFairness.label_dimensi">Atribut terproteksi</label>
+        <select id="selDimensi" class="medan">
+          <option value="jenis_kelamin" data-i18n="dimensi.jenis_kelamin">Jenis kelamin</option>
+          <option value="kelompok_usia" data-i18n="dimensi.kelompok_usia">Kelompok usia</option>
+          <option value="disabilitas" data-i18n="dimensi.disabilitas">Disabilitas</option>
+          <option value="unit" data-i18n="dimensi.unit">Unit</option>
+        </select>
+      </div>
+      <div>
+        <label for="selMetrik" class="block text-sm font-medium mb-1.5" data-i18n="auditFairness.label_metrik">Metrik</label>
+        <select id="selMetrik" class="medan">
+          <option value="parity" data-i18n="fairness.metrik.parity">Paritas demografis</option>
+          <option value="equal_opportunity" data-i18n="fairness.metrik.equal_opportunity">Kesetaraan peluang</option>
+          <option value="equalized_odds" data-i18n="fairness.metrik.equalized_odds">Equalized odds</option>
+        </select>
+      </div>
+      <p class="sm:col-span-3 text-mikro text-tinta-redup" data-i18n="fairness.ket_metrik">Metrik selain paritas butuh label kebenaran (hasil nyata) yang belum tersedia.</p>
+    </form>
+  </section>
+
+  <section class="kartu p-6">
+    <div id="ketSiklus" class="mb-4"></div>
+    <div id="wadahAudit"></div>
+  </section>
+</main>
+
+<script type="module">
+import { getJSON } from "/assets/js/jscroot/api.js";
+import { getQueryString } from "/assets/js/jscroot/url.js";
+import { requireLogin, requireRole, tokenHeader } from "/assets/js/auth.js";
+import { sehat, el, kosongkan, sembunyikan } from "/assets/js/ui.js";
+import { t } from "/assets/js/i18n.js";
+import { pasang } from "/assets/js/nav.js";
+import {
+    DIMENSI, METRIK, renderAudit, urlAudit, muatSiklusDijalankan, siklusBawaan,
+    isiPilihanSiklus, keteranganSiklus,
+} from "/assets/js/fairness.js";
+
+if (requireLogin() && requireRole("A-01")) {
+    pasang("A-01");
+    const elPesan = document.getElementById("pesan");
+    const selSiklus = document.getElementById("selSiklus");
+    const selDimensi = document.getElementById("selDimensi");
+    const selMetrik = document.getElementById("selMetrik");
+    const elKetSiklus = document.getElementById("ketSiklus");
+    const wadahAudit = document.getElementById("wadahAudit");
+
+    const qs = getQueryString();
+    let daftarSiklus = [];
+    let permintaan = 0;
+
+    selDimensi.value = DIMENSI.includes(qs.dimensi) ? qs.dimensi : DIMENSI[0];
+    selMetrik.value = METRIK.includes(qs.metrik) ? qs.metrik : METRIK[0];
+
+    function simpanKeUrl() {
+        const p = new URLSearchParams();
+        if (selSiklus.value) p.set("siklus", selSiklus.value);
+        p.set("dimensi", selDimensi.value);
+        p.set("metrik", selMetrik.value);
+        history.replaceState(null, "", window.location.pathname + "?" + p.toString());
+    }
+
+    function muatAudit() {
+        simpanKeUrl();
+        sembunyikan(elPesan);
+        kosongkan(wadahAudit);
+        kosongkan(elKetSiklus);
+        const id = selSiklus.value;
+        if (!id) return;
+        const siklus = daftarSiklus.find(function (s) { return s.id === id; });
+        elKetSiklus.appendChild(keteranganSiklus(siklus || { id: id }));
+        const nomor = ++permintaan;
+        getJSON(urlAudit(id, selDimensi.value, selMetrik.value), function (hasil) {
+            if (!sehat(hasil, elPesan)) return;
+            if (nomor !== permintaan) return;
+            renderAudit(wadahAudit, hasil.data.data || {});
+        }, ...tokenHeader());
+    }
+
+    [selSiklus, selDimensi, selMetrik].forEach(function (s) { s.addEventListener("change", muatAudit); });
+
+    muatSiklusDijalankan(elPesan, function (daftar) {
+        daftarSiklus = daftar;
+        const bawaan = siklusBawaan(daftar);
+        let terpilih = qs.siklus || (bawaan ? bawaan.id : "");
+        // Siklus dari tautan yang tidak ada di daftar tetap diminta; backend yang menilai.
+        const pilihan = daftar.slice();
+        if (terpilih && !daftar.some(function (s) { return s.id === terpilih; })) {
+            pilihan.unshift({ id: terpilih, nama: terpilih });
+        }
+        isiPilihanSiklus(selSiklus, pilihan, terpilih);
+        if (!pilihan.length) {
+            selSiklus.disabled = true;
+            kosongkan(wadahAudit);
+            wadahAudit.appendChild(el("p", "text-sm text-tinta-redup", t("fairness.belum_ada_siklus")));
+            return;
+        }
+        muatAudit();
+    });
+}
+</script>
+</body>
+</html>

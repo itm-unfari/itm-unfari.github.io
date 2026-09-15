@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+<html lang="id" data-judul="riwayatTataKelola.judul_halaman">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Internal Talent Marketplace</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=Plus+Jakarta+Sans:wght@400..700&display=swap" rel="stylesheet">
+  <script src="/assets/js/prapasang.js"></script>
+  <link rel="stylesheet" href="/assets/css/app.css">
+</head>
+<body>
+
+<main class="mx-auto max-w-5xl px-5 py-6 space-y-5">
+  <div id="pesan" hidden role="alert"></div>
+
+  <section class="kartu p-6">
+    <h2 class="eyebrow text-tinta-redup mb-2" data-i18n="riwayatTataKelola.aturan_judul">Versi aturan matching</h2>
+    <p class="text-sm text-tinta-redup mb-4" data-i18n="riwayatTataKelola.aturan_ket">Setiap perubahan aturan adalah versi baru; versi lama tidak pernah ditimpa.</p>
+    <div id="wadahAturan"></div>
+  </section>
+
+  <section class="kartu p-6">
+    <h2 class="eyebrow text-tinta-redup mb-2" data-i18n="riwayatTataKelola.kondisi_judul">Versi kondisi batas</h2>
+    <p class="text-sm text-tinta-redup mb-4" data-i18n="riwayatTataKelola.kondisi_ket">Pernyataan ditampilkan dalam bahasa penulisannya, tanpa terjemahan mesin.</p>
+    <div id="wadahKondisi" class="space-y-3"></div>
+  </section>
+</main>
+
+<script type="module">
+import { getJSON } from "/assets/js/jscroot/api.js";
+import { asal } from "/assets/js/config.js";
+import { requireLogin, requireRole, tokenHeader } from "/assets/js/auth.js";
+import { sehat, el, kosongkan, lencana, tabel, baris, kosong } from "/assets/js/ui.js";
+import { t } from "/assets/js/i18n.js";
+import { pasang } from "/assets/js/nav.js";
+import { persen } from "/assets/js/fairness.js";
+import { tanggal, navigasiHalaman, gambarVersiKondisi } from "/assets/js/tata-kelola.js";
+
+if (requireLogin() && requireRole("A-02")) {
+    pasang("A-02");
+    const elPesan = document.getElementById("pesan");
+    const wadahAturan = document.getElementById("wadahAturan");
+    const wadahKondisi = document.getElementById("wadahKondisi");
+    const BATAS = 20;
+    const KOLOM_ATURAN = 8;
+
+    function selAsal(a) {
+        const w = el("div", "flex flex-wrap items-center gap-1.5");
+        w.appendChild(el("span", "font-data font-medium", a.versi != null ? String(a.versi) : a.id));
+        if (a.aktif) w.appendChild(lencana(t("umum.aktif"), "sah"));
+        w.appendChild(lencana(t("riwayatTataKelola.asal." + a.asal), "netral"));
+        if (a.asal === "dipelajari" && !a.aktif) w.appendChild(lencana(t("umum.tandaAI"), "tinjau"));
+        return w;
+    }
+
+    function selParameter(a) {
+        const w = el("dl", "grid grid-cols-2 gap-x-3 text-mikro whitespace-nowrap");
+        [
+            [t("riwayatTataKelola.ambang"), String(a.ambang_rekomendasi)],
+            ["k", String(a.k)],
+            [t("riwayatTataKelola.pakai_tepi"), t(a.pakai_tepi ? "umum.ya" : "umum.tidak")],
+        ].forEach(function (p) {
+            w.appendChild(el("dt", "text-tinta-redup", p[0]));
+            w.appendChild(el("dd", "font-data", p[1]));
+        });
+        return w;
+    }
+
+    function selProksi(a) {
+        const daftar = a.fitur_proksi || [];
+        if (!daftar.length) return el("span", "text-tinta-redup", t("riwayatTataKelola.proksi_kosong"));
+        const ul = el("ul", "flex flex-wrap gap-1");
+        ul.dataset.uji = "fitur-proksi";
+        daftar.forEach(function (f) {
+            const li = el("li", "");
+            li.appendChild(lencana(f, "tinjau"));
+            ul.appendChild(li);
+        });
+        return ul;
+    }
+
+    function barisPengali(a) {
+        const tr = el("tr", "border-b border-garis-tipis bg-latar");
+        tr.hidden = true;
+        const td = el("td", "px-3 py-3");
+        td.colSpan = KOLOM_ATURAN;
+        td.appendChild(el("p", "text-sm mb-2", t("riwayatTataKelola.pengali_bawaan", { nilai: a.pengali_bawaan != null ? a.pengali_bawaan : "—" })));
+        const kode = Object.keys(a.pengali || {}).sort();
+        if (!kode.length) {
+            td.appendChild(el("p", "text-sm text-tinta-redup", t("riwayatTataKelola.pengali_kosong")));
+        } else {
+            const ul = el("ul", "grid grid-cols-2 gap-x-6 gap-y-1 sm:grid-cols-4");
+            kode.forEach(function (k) {
+                const li = el("li", "flex justify-between gap-3 font-data text-sm");
+                li.appendChild(el("span", "", k));
+                li.appendChild(el("span", "", String(a.pengali[k])));
+                ul.appendChild(li);
+            });
+            td.appendChild(ul);
+        }
+        tr.appendChild(td);
+        return tr;
+    }
+
+    function muatAturan(halaman) {
+        getJSON(asal + "/api/aturan?limit=" + BATAS + "&page=" + halaman, function (hasil) {
+            if (!sehat(hasil, elPesan)) return;
+            const daftar = hasil.data.data || [];
+            kosongkan(wadahAturan);
+            const { wadah, tbody } = tabel([
+                t("riwayatTataKelola.kolom_versi"), t("riwayatTataKelola.kolom_parameter"),
+                t("riwayatTataKelola.kolom_pengali"), t("riwayatTataKelola.kolom_proksi"),
+                t("riwayatTataKelola.kolom_akurasi"), t("riwayatTataKelola.kolom_catatan"),
+                t("umum.dibuat"), "",
+            ]);
+            if (!daftar.length) tbody.appendChild(kosong(KOLOM_ATURAN, t("umum.tidak_ada_data")));
+            daftar.forEach(function (a) {
+                const jumlah = Object.keys(a.pengali || {}).length;
+                const rinci = barisPengali(a);
+                const btn = el("button", "tombol-halus whitespace-nowrap", t("umum.detail"));
+                btn.type = "button";
+                btn.setAttribute("aria-expanded", "false");
+                btn.addEventListener("click", function () {
+                    rinci.hidden = !rinci.hidden;
+                    btn.setAttribute("aria-expanded", String(!rinci.hidden));
+                });
+                const catatan = el("span", "block min-w-[10rem] whitespace-pre-wrap break-words", a.catatan || "—");
+                tbody.appendChild(baris([
+                    selAsal(a),
+                    selParameter(a),
+                    el("span", "font-data", String(jumlah)),
+                    selProksi(a),
+                    el("span", "font-data", a.akurasi != null ? persen(a.akurasi) : "—"),
+                    catatan,
+                    el("span", "whitespace-nowrap", tanggal(a.dibuat)),
+                    btn,
+                ]));
+                tbody.appendChild(rinci);
+            });
+            wadahAturan.appendChild(wadah);
+            wadahAturan.appendChild(navigasiHalaman(hasil.data.meta, muatAturan));
+        }, ...tokenHeader());
+    }
+
+    function muatKondisi(halaman) {
+        getJSON(asal + "/api/kondisi-batas?limit=" + BATAS + "&page=" + halaman, function (hasil) {
+            if (!sehat(hasil, elPesan)) return;
+            const daftar = hasil.data.data || [];
+            kosongkan(wadahKondisi);
+            if (!daftar.length) wadahKondisi.appendChild(el("p", "text-sm text-tinta-redup", t("umum.tidak_ada_data")));
+            daftar.forEach(function (v) { wadahKondisi.appendChild(gambarVersiKondisi(v, !!v.aktif)); });
+            wadahKondisi.appendChild(navigasiHalaman(hasil.data.meta, muatKondisi));
+        }, ...tokenHeader());
+    }
+
+    muatAturan(1);
+    muatKondisi(1);
+}
+</script>
+</body>
+</html>

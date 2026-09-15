@@ -1,0 +1,239 @@
+<!DOCTYPE html>
+<html lang="id" data-judul="kondisiBatas.judul_halaman">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Internal Talent Marketplace</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=Plus+Jakarta+Sans:wght@400..700&display=swap" rel="stylesheet">
+  <script src="/assets/js/prapasang.js"></script>
+  <link rel="stylesheet" href="/assets/css/app.css">
+</head>
+<body>
+
+<main class="mx-auto max-w-3xl px-5 py-6 space-y-5">
+  <div id="pesan" hidden role="alert"></div>
+
+  <section class="kartu p-6">
+    <h2 class="eyebrow text-tinta-redup mb-2" data-i18n="kondisiBatas.aktif_judul">Versi yang berlaku</h2>
+    <p class="text-sm text-tinta-redup mb-4" data-i18n="kondisiBatas.ket_rujukan">Keputusan lama tetap merujuk versi kondisi batas yang berlaku saat keputusan itu dibuat; versi baru hanya berlaku ke depan.</p>
+    <div id="wadahAktif"></div>
+  </section>
+
+  <section id="bagianForm" class="kartu p-6" hidden>
+    <h2 class="eyebrow text-tinta-redup mb-2" data-i18n="kondisiBatas.form_judul">Catat versi baru</h2>
+    <p class="text-sm text-tinta-redup mb-4" data-i18n="kondisiBatas.form_ket">Isi sedikitnya satu pernyataan untuk setiap dimensi. Pernyataan disimpan dalam bahasa yang Anda pilih dan tidak diterjemahkan mesin. Versi baru langsung berlaku.</p>
+    <div id="pesanForm" hidden role="alert"></div>
+    <button type="button" id="tombolSalin" class="tombol-halus mb-4" data-i18n="kondisiBatas.salin_aktif" hidden>Mulai dari versi yang berlaku</button>
+    <form id="formKondisi" class="space-y-5" novalidate>
+      <div id="wadahDimensi" class="space-y-5"></div>
+      <button type="submit" id="tombolSimpan" class="tombol-utama" data-i18n="kondisiBatas.simpan">Catat sebagai versi baru</button>
+    </form>
+  </section>
+
+  <section class="kartu p-6">
+    <h2 class="eyebrow text-tinta-redup mb-4" data-i18n="kondisiBatas.riwayat_judul">Versi sebelumnya</h2>
+    <div id="wadahRiwayat" class="space-y-3"></div>
+  </section>
+</main>
+
+<script type="module">
+import { getJSON, postJSON } from "/assets/js/jscroot/api.js";
+import { asal, PERAN } from "/assets/js/config.js";
+import { requireLogin, requireRole, tokenHeader, getUser } from "/assets/js/auth.js";
+import { pesan, sembunyikan, sehat, el, kosongkan } from "/assets/js/ui.js";
+import { t, bahasa } from "/assets/js/i18n.js";
+import { pasang } from "/assets/js/nav.js";
+import {
+    DIMENSI_KONDISI, BAHASA_PERNYATAAN, navigasiHalaman, gambarVersiKondisi, gambarPernyataan, tanggal,
+} from "/assets/js/tata-kelola.js";
+
+if (requireLogin() && requireRole("H-07")) {
+    pasang("H-07");
+    const elPesan = document.getElementById("pesan");
+    const elPesanForm = document.getElementById("pesanForm");
+    const wadahAktif = document.getElementById("wadahAktif");
+    const wadahRiwayat = document.getElementById("wadahRiwayat");
+    const bagianForm = document.getElementById("bagianForm");
+    const wadahDimensi = document.getElementById("wadahDimensi");
+    const form = document.getElementById("formKondisi");
+    const tombolSimpan = document.getElementById("tombolSimpan");
+    const tombolSalin = document.getElementById("tombolSalin");
+    const BATAS = 20;
+    const bolehMenulis = (getUser() || {}).role !== PERAN.PAKAR;
+
+    let versiAktif = null;
+    let nomorBaris = 0;
+    const grupDimensi = {};
+
+    // ── tampilan ──
+
+    function gambarAktif(v) {
+        kosongkan(wadahAktif);
+        versiAktif = v;
+        tombolSalin.hidden = !v;
+        if (!v) {
+            wadahAktif.appendChild(el("p", "text-sm text-tinta-redup", t("galat.kondisi_batas_tidak_aktif")));
+            return;
+        }
+        const kepala = el("div", "flex flex-wrap items-baseline gap-2 mb-4");
+        kepala.appendChild(el("span", "judul-halaman text-lg font-data", v.versi != null ? String(v.versi) : v.id));
+        const tgl = tanggal(v.dibuat);
+        if (tgl) kepala.appendChild(el("span", "text-sm text-tinta-redup", t("kondisiBatas.berlaku_sejak", { tanggal: tgl })));
+        wadahAktif.appendChild(kepala);
+        const isi = gambarPernyataan(v.pernyataan);
+        isi.dataset.uji = "kondisi-aktif";
+        wadahAktif.appendChild(isi);
+    }
+
+    function muat(halaman) {
+        getJSON(asal + "/api/kondisi-batas?limit=" + BATAS + "&page=" + halaman, function (hasil) {
+            if (!sehat(hasil, elPesan)) return;
+            const daftar = hasil.data.data || [];
+            const aktif = daftar.find(function (v) { return v.aktif; });
+            // Daftar terbaru dulu, jadi versi aktif selalu ada di halaman 1.
+            if (halaman === 1) gambarAktif(aktif || null);
+            kosongkan(wadahRiwayat);
+            const lama = daftar.filter(function (v) { return !v.aktif; });
+            if (!lama.length) wadahRiwayat.appendChild(el("p", "text-sm text-tinta-redup", t("kondisiBatas.riwayat_kosong")));
+            lama.forEach(function (v) { wadahRiwayat.appendChild(gambarVersiKondisi(v, false)); });
+            const meta = hasil.data.meta || {};
+            if ((meta.total_pages || 1) > 1) wadahRiwayat.appendChild(navigasiHalaman(meta, muat));
+        }, ...tokenHeader());
+    }
+
+    // ── formulir ──
+
+    function pilihanBahasa(nilai) {
+        const sel = el("select", "medan w-auto");
+        BAHASA_PERNYATAAN.forEach(function (b) {
+            const opt = el("option", "", t("kondisiBatas.bahasa." + b));
+            opt.value = b;
+            sel.appendChild(opt);
+        });
+        sel.value = nilai;
+        return sel;
+    }
+
+    function segarkanTombol(d) {
+        const g = grupDimensi[d];
+        const n = g.baris.children.length;
+        g.tambah.hidden = n >= BAHASA_PERNYATAAN.length;
+        Array.prototype.forEach.call(g.baris.children, function (b) { b.querySelector("[data-hapus]").hidden = n <= 1; });
+    }
+
+    function tambahBaris(d, teks, bhs) {
+        const g = grupDimensi[d];
+        const b = el("div", "space-y-2");
+        b.dataset.baris = "pernyataan";
+        const area = el("textarea", "medan");
+        area.rows = 3;
+        area.id = "teks-" + d + "-" + (++nomorBaris);
+        area.value = teks || "";
+        area.setAttribute("aria-label", t("kondisiBatas.label_pernyataan", { dimensi: t("dimensiKondisi." + d) }));
+        const bawah = el("div", "flex flex-wrap items-center gap-3");
+        const lbl = el("label", "text-sm font-medium", t("kondisiBatas.label_bahasa"));
+        const sel = pilihanBahasa(bhs || "id");
+        sel.id = area.id + "-bahasa";
+        lbl.htmlFor = sel.id;
+        bawah.appendChild(lbl);
+        bawah.appendChild(sel);
+        const hapus = el("button", "tombol-halus ml-auto", t("umum.hapus"));
+        hapus.type = "button";
+        hapus.dataset.hapus = "1";
+        hapus.addEventListener("click", function () { b.remove(); segarkanTombol(d); });
+        bawah.appendChild(hapus);
+        b.appendChild(area);
+        b.appendChild(bawah);
+        g.baris.appendChild(b);
+        segarkanTombol(d);
+        return b;
+    }
+
+    function bangunForm() {
+        kosongkan(wadahDimensi);
+        DIMENSI_KONDISI.forEach(function (d) {
+            const fs = el("fieldset", "space-y-3 rounded-xl border border-garis p-4");
+            fs.appendChild(el("legend", "px-1 text-sm font-medium", t("dimensiKondisi." + d)));
+            const wadahBaris = el("div", "space-y-4");
+            fs.appendChild(wadahBaris);
+            const tambah = el("button", "tombol-halus", t("kondisiBatas.tambah_bahasa"));
+            tambah.type = "button";
+            fs.appendChild(tambah);
+            grupDimensi[d] = { baris: wadahBaris, tambah: tambah };
+            tambah.addEventListener("click", function () {
+                const dipakai = bacaBaris(d).map(function (p) { return p.bahasa; });
+                const sisa = BAHASA_PERNYATAAN.find(function (b) { return !dipakai.includes(b); }) || "id";
+                tambahBaris(d, "", sisa).querySelector("textarea").focus();
+            });
+            wadahDimensi.appendChild(fs);
+            tambahBaris(d, "", bahasa());
+        });
+    }
+
+    function bacaBaris(d) {
+        return Array.prototype.map.call(grupDimensi[d].baris.children, function (b) {
+            return { dimensi: d, bahasa: b.querySelector("select").value, teks: b.querySelector("textarea").value.trim() };
+        });
+    }
+
+    // periksa mengembalikan pesan galat pertama, atau "" bila formulir layak dikirim.
+    function periksa() {
+        for (const d of DIMENSI_KONDISI) {
+            const daftar = bacaBaris(d);
+            const nama = t("dimensiKondisi." + d);
+            if (!daftar.length || daftar.every(function (p) { return !p.teks; })) return t("kondisiBatas.galat_dimensi_kosong", { dimensi: nama });
+            if (daftar.some(function (p) { return !p.teks; })) return t("kondisiBatas.galat_baris_kosong", { dimensi: nama });
+            const bhs = daftar.map(function (p) { return p.bahasa; });
+            if (new Set(bhs).size !== bhs.length) return t("kondisiBatas.galat_bahasa_ganda", { dimensi: nama });
+        }
+        return "";
+    }
+
+    tombolSalin.addEventListener("click", function () {
+        if (!versiAktif) return;
+        sembunyikan(elPesanForm);
+        DIMENSI_KONDISI.forEach(function (d) {
+            kosongkan(grupDimensi[d].baris);
+            const isi = (versiAktif.pernyataan || []).filter(function (p) { return p.dimensi === d; });
+            if (!isi.length) tambahBaris(d, "", bahasa());
+            isi.slice(0, BAHASA_PERNYATAAN.length).forEach(function (p) { tambahBaris(d, p.teks, p.bahasa); });
+        });
+    });
+
+    form.addEventListener("submit", function (e) {
+        e.preventDefault();
+        sembunyikan(elPesanForm);
+        const galat = periksa();
+        if (galat) {
+            pesan(elPesanForm, galat, "tinjau");
+            return;
+        }
+        if (!window.confirm(t("kondisiBatas.konfirmasi"))) return;
+        const pernyataan = [];
+        DIMENSI_KONDISI.forEach(function (d) { bacaBaris(d).forEach(function (p) { pernyataan.push(p); }); });
+        tombolSimpan.disabled = true;
+        postJSON(asal + "/api/kondisi-batas", { pernyataan: pernyataan }, lepasTombol(function (hasil) {
+            if (!sehat(hasil, elPesanForm)) return;
+            bangunForm();
+            pesan(elPesanForm, t("kondisiBatas.berhasil"), "sah");
+            muat(1);
+        }), ...tokenHeader());
+    });
+
+    // lepasTombol mengaktifkan kembali tombol simpan apa pun hasilnya, supaya
+    // callback di dalamnya tetap diawali sehat().
+    function lepasTombol(cb) {
+        return function (hasil) { tombolSimpan.disabled = false; cb(hasil); };
+    }
+
+    if (bolehMenulis) {
+        bagianForm.hidden = false;
+        bangunForm();
+    }
+    muat(1);
+}
+</script>
+</body>
+</html>

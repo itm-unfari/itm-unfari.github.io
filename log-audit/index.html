@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="id" data-judul="logAudit.judul_halaman">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Internal Talent Marketplace</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=Plus+Jakarta+Sans:wght@400..700&display=swap" rel="stylesheet">
+  <script src="/assets/js/prapasang.js"></script>
+  <link rel="stylesheet" href="/assets/css/app.css">
+</head>
+<body>
+
+<main class="mx-auto max-w-5xl px-5 py-6 space-y-5">
+  <div id="pesan" hidden role="alert"></div>
+  <section class="kartu p-6">
+    <h2 class="eyebrow text-tinta-redup mb-2" data-i18n="logAudit.daftar">Catatan tindakan tata kelola</h2>
+    <p class="text-sm text-tinta-redup mb-4" data-i18n="logAudit.ket">Log hanya bertambah, terbaru di atas. Catatan tidak dapat diubah atau dihapus.</p>
+    <div id="wadahTabel"></div>
+  </section>
+</main>
+
+<script type="module">
+import { getJSON } from "/assets/js/jscroot/api.js";
+import { asal } from "/assets/js/config.js";
+import { requireLogin, requireRole, tokenHeader } from "/assets/js/auth.js";
+import { sehat, el, kosongkan, tabel, baris, kosong } from "/assets/js/ui.js";
+import { t } from "/assets/js/i18n.js";
+import { pasang } from "/assets/js/nav.js";
+import { waktu, navigasiHalaman } from "/assets/js/tata-kelola.js";
+
+if (requireLogin() && requireRole("A-03")) {
+    pasang("A-03");
+    const elPesan = document.getElementById("pesan");
+    const wadahTabel = document.getElementById("wadahTabel");
+    const BATAS = 50;
+
+    // Nilai yang belum ada di kamus ditampilkan mentah, bukan sebagai kunci.
+    function label(kunci, mentah) {
+        const teks = t(kunci);
+        return teks === kunci ? String(mentah == null ? "" : mentah) : teks;
+    }
+
+    function muat(halaman) {
+        getJSON(asal + "/api/log-audit?limit=" + BATAS + "&page=" + halaman, function (hasil) {
+            if (!sehat(hasil, elPesan)) return;
+            const daftar = hasil.data.data || [];
+            kosongkan(wadahTabel);
+            const { wadah, tbody } = tabel([
+                t("logAudit.kolom_waktu"), t("umum.aksi"), t("logAudit.kolom_peran"),
+                t("logAudit.kolom_objek_jenis"), t("logAudit.kolom_objek_id"), t("umum.oleh"),
+            ]);
+            if (!daftar.length) tbody.appendChild(kosong(6, t("umum.tidak_ada_data")));
+            daftar.forEach(function (c) {
+                tbody.appendChild(baris([
+                    el("span", "whitespace-nowrap font-data text-mikro", waktu(c.pada)),
+                    label("logAudit.aksi." + c.aksi, c.aksi),
+                    label("peran." + c.peran, c.peran),
+                    label("logAudit.objek." + c.objek_jenis, c.objek_jenis),
+                    el("span", "font-data text-mikro break-all", c.objek_id || ""),
+                    el("span", "font-data text-mikro break-all", c.oleh || ""),
+                ]));
+            });
+            wadahTabel.appendChild(wadah);
+            wadahTabel.appendChild(navigasiHalaman(hasil.data.meta, muat));
+        }, ...tokenHeader());
+    }
+
+    muat(1);
+}
+</script>
+</body>
+</html>

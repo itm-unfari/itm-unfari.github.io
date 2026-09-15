@@ -1,0 +1,156 @@
+<!DOCTYPE html>
+<html lang="id" data-judul="dashboardFairness.judul_halaman">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Internal Talent Marketplace</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=Plus+Jakarta+Sans:wght@400..700&display=swap" rel="stylesheet">
+  <script src="/assets/js/prapasang.js"></script>
+  <link rel="stylesheet" href="/assets/css/app.css">
+</head>
+<body>
+
+<main class="mx-auto max-w-5xl px-5 py-6 space-y-5">
+  <div id="pesan" hidden role="alert"></div>
+
+  <section class="kartu p-6">
+    <h2 class="eyebrow text-tinta-redup mb-2" data-i18n="dashboardFairness.judul">Fairness per siklus dan per atribut terproteksi</h2>
+    <p class="text-sm text-tinta-redup mb-4" data-i18n="dashboardFairness.ket">Keempat atribut terproteksi untuk satu siklus sekaligus. Pilih satu atribut untuk melihat tabel lengkapnya.</p>
+    <label for="selSiklus" class="block text-sm font-medium mb-1.5" data-i18n="dashboardFairness.label_siklus">Siklus</label>
+    <select id="selSiklus" class="medan"></select>
+    <div id="ketSiklus" class="mt-3"></div>
+  </section>
+
+  <div id="kisi" class="grid gap-5 sm:grid-cols-2"></div>
+
+  <section class="kartu p-6">
+    <h2 class="eyebrow text-tinta-redup mb-4" data-i18n="dashboardFairness.detail">Rincian atribut terpilih</h2>
+    <div id="wadahDetail"></div>
+  </section>
+</main>
+
+<script type="module">
+import { getJSON } from "/assets/js/jscroot/api.js";
+import { getQueryString } from "/assets/js/jscroot/url.js";
+import { requireLogin, requireRole, tokenHeader } from "/assets/js/auth.js";
+import { sehat, el, kosongkan, sembunyikan } from "/assets/js/ui.js";
+import { t } from "/assets/js/i18n.js";
+import { pasang } from "/assets/js/nav.js";
+import {
+    DIMENSI, renderAudit, plotRasio, lencanaRingkas, urlAudit, muatSiklusDijalankan,
+    siklusBawaan, isiPilihanSiklus, keteranganSiklus,
+} from "/assets/js/fairness.js";
+
+if (requireLogin() && requireRole("H-04")) {
+    pasang("H-04");
+    const elPesan = document.getElementById("pesan");
+    const selSiklus = document.getElementById("selSiklus");
+    const elKetSiklus = document.getElementById("ketSiklus");
+    const kisi = document.getElementById("kisi");
+    const wadahDetail = document.getElementById("wadahDetail");
+
+    const qs = getQueryString();
+    let daftarSiklus = [];
+    let dimensiTerpilih = DIMENSI.includes(qs.dimensi) ? qs.dimensi : DIMENSI[0];
+    let audit = {};
+    let tombolDetail = {};
+    let putaran = 0;
+
+    function simpanKeUrl() {
+        const p = new URLSearchParams();
+        if (selSiklus.value) p.set("siklus", selSiklus.value);
+        p.set("dimensi", dimensiTerpilih);
+        history.replaceState(null, "", window.location.pathname + "?" + p.toString());
+    }
+
+    function gambarDetail() {
+        kosongkan(wadahDetail);
+        Object.keys(tombolDetail).forEach(function (d) {
+            tombolDetail[d].setAttribute("aria-pressed", String(d === dimensiTerpilih));
+        });
+        const a = audit[dimensiTerpilih];
+        if (!a) {
+            wadahDetail.appendChild(el("p", "text-sm text-tinta-redup", t("dashboardFairness.detail_belum", { dimensi: t("dimensi." + dimensiTerpilih) })));
+            return;
+        }
+        renderAudit(wadahDetail, a);
+    }
+
+    function pilihDimensi(d) {
+        dimensiTerpilih = d;
+        simpanKeUrl();
+        gambarDetail();
+        wadahDetail.scrollIntoView({ behavior: "smooth", block: "start" });
+    }
+
+    function kartuDimensi(d, nomor) {
+        const kartu = el("section", "kartu p-5 space-y-3 min-w-0");
+        kartu.dataset.dimensi = d;
+        kartu.appendChild(el("h3", "font-medium", t("dimensi." + d)));
+        // Teks "memproses" ditulis di elemen pesan kartu: galat dari sehat()
+        // menimpanya, sukses menyembunyikannya.
+        const elPesanKartu = el("div", "text-sm text-tinta-redup", t("umum.memproses"));
+        elPesanKartu.setAttribute("role", "alert");
+        kartu.appendChild(elPesanKartu);
+        const isi = el("div", "space-y-3");
+        kartu.appendChild(isi);
+        const btn = el("button", "tombol-halus", t("dashboardFairness.lihat_detail"));
+        btn.type = "button";
+        btn.setAttribute("aria-pressed", String(d === dimensiTerpilih));
+        btn.addEventListener("click", function () { pilihDimensi(d); });
+        tombolDetail[d] = btn;
+        kartu.appendChild(btn);
+
+        getJSON(urlAudit(selSiklus.value, d, "parity"), function (hasil) {
+            if (!sehat(hasil, elPesanKartu)) return;
+            if (nomor !== putaran) return;
+            const a = hasil.data.data || {};
+            audit[d] = a;
+            sembunyikan(elPesanKartu);
+            isi.appendChild(lencanaRingkas(a));
+            isi.appendChild(plotRasio(a, { legenda: false }));
+            if (d === dimensiTerpilih) gambarDetail();
+        }, ...tokenHeader());
+        return kartu;
+    }
+
+    function muatSemua() {
+        simpanKeUrl();
+        sembunyikan(elPesan);
+        const nomor = ++putaran;
+        audit = {};
+        tombolDetail = {};
+        kosongkan(kisi);
+        kosongkan(elKetSiklus);
+        kosongkan(wadahDetail);
+        if (!selSiklus.value) return;
+        const siklus = daftarSiklus.find(function (s) { return s.id === selSiklus.value; });
+        elKetSiklus.appendChild(keteranganSiklus(siklus || { id: selSiklus.value }));
+        DIMENSI.forEach(function (d) { kisi.appendChild(kartuDimensi(d, nomor)); });
+        gambarDetail();
+    }
+
+    selSiklus.addEventListener("change", muatSemua);
+
+    muatSiklusDijalankan(elPesan, function (daftar) {
+        daftarSiklus = daftar;
+        const bawaan = siklusBawaan(daftar);
+        const terpilih = qs.siklus || (bawaan ? bawaan.id : "");
+        const pilihan = daftar.slice();
+        if (terpilih && !daftar.some(function (s) { return s.id === terpilih; })) {
+            pilihan.unshift({ id: terpilih, nama: terpilih });
+        }
+        isiPilihanSiklus(selSiklus, pilihan, terpilih);
+        if (!pilihan.length) {
+            selSiklus.disabled = true;
+            wadahDetail.appendChild(el("p", "text-sm text-tinta-redup", t("fairness.belum_ada_siklus")));
+            return;
+        }
+        muatSemua();
+    });
+}
+</script>
+</body>
+</html>

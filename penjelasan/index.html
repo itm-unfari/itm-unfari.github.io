@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html lang="id" data-judul="penjelasan.judul_halaman">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Internal Talent Marketplace</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=Plus+Jakarta+Sans:wght@400..700&display=swap" rel="stylesheet">
+  <script src="/assets/js/prapasang.js"></script>
+  <link rel="stylesheet" href="/assets/css/app.css">
+</head>
+<body>
+
+<main class="mx-auto max-w-3xl px-5 py-6 space-y-5">
+  <div id="pesan" hidden role="alert"></div>
+  <a href="javascript:history.back()" class="text-sm text-tinta-redup hover:underline" data-i18n="umum.kembali">Kembali</a>
+
+  <section class="kartu p-6">
+    <div class="flex items-start justify-between gap-3 mb-1">
+      <h2 id="judulPeluang" class="judul-halaman text-lg"></h2>
+      <span id="lencanaStatus"></span>
+    </div>
+    <p id="subPeluang" class="text-sm text-tinta-redup mb-5"></p>
+    <div id="wadahKontribusi"></div>
+    <div id="wadahAksi" class="flex flex-wrap gap-2 mt-6"></div>
+  </section>
+</main>
+
+<script type="module">
+import { getJSON, postJSON } from "/assets/js/jscroot/api.js";
+import { getQueryString } from "/assets/js/jscroot/url.js";
+import { asal, PERAN } from "/assets/js/config.js";
+import { requireLogin, requireRole, tokenHeader, getUser } from "/assets/js/auth.js";
+import { pesan, sehat, el, kosongkan, lencana } from "/assets/js/ui.js";
+import { t } from "/assets/js/i18n.js";
+import { pasang } from "/assets/js/nav.js";
+import { renderKontribusi } from "/assets/js/kontribusi.js";
+
+// TRANSISI cermin model.TransisiStatus (backend/model/match.go) HANYA untuk
+// menentukan tombol mana yang ditampilkan; backend tetap satu-satunya yang
+// menegakkan. Salah menampilkan tombol di sini hanya berakibat 400 dari
+// server, bukan celah izin.
+const TRANSISI = {
+    direkomendasikan: { berminat: [PERAN.KARYAWAN], tidak_berminat: [PERAN.KARYAWAN], ditinjau: [PERAN.HR, PERAN.MANAJER] },
+    tidak_direkomendasikan: { berminat: [PERAN.KARYAWAN] },
+    berminat: { ditinjau: [PERAN.HR, PERAN.MANAJER], diterima: [PERAN.HR, PERAN.MANAJER], ditolak: [PERAN.HR, PERAN.MANAJER] },
+    ditinjau: { diterima: [PERAN.HR, PERAN.MANAJER], ditolak: [PERAN.HR, PERAN.MANAJER] },
+};
+
+if (requireLogin() && requireRole("K-04")) {
+    pasang("K-04");
+    const elPesan = document.getElementById("pesan");
+    const id = getQueryString().id;
+    const peran = getUser().role;
+
+    if (!id) {
+        pesan(elPesan, t("penjelasan.tanpa_id"), "galat");
+    } else {
+        muat();
+    }
+
+    function jenisMatch(status) {
+        if (status === "diterima" || status === "berminat") return "sah";
+        if (status === "ditolak" || status === "tidak_berminat" || status === "tidak_direkomendasikan") return "netral";
+        if (status === "ditinjau") return "tinjau";
+        return "netral";
+    }
+
+    function muat() {
+        getJSON(asal + "/api/match/" + encodeURIComponent(id), function (hasil) {
+            if (!sehat(hasil, elPesan)) return;
+            const d = hasil.data.data;
+            gambar(d);
+        }, ...tokenHeader());
+    }
+
+    function gambar(d) {
+        document.getElementById("judulPeluang").textContent = d.peluang.judul;
+        document.getElementById("subPeluang").textContent = t("jenis." + d.peluang.jenis) + " · " + d.peluang.unit + " · " + d.karyawan.nama;
+        const elStatus = document.getElementById("lencanaStatus");
+        kosongkan(elStatus);
+        elStatus.appendChild(lencana(t("status.match." + d.match.status), jenisMatch(d.match.status)));
+
+        renderKontribusi(document.getElementById("wadahKontribusi"), d.match, d.skill);
+
+        const wadahAksi = document.getElementById("wadahAksi");
+        kosongkan(wadahAksi);
+        const tujuan = TRANSISI[d.match.status] || {};
+        Object.keys(tujuan).forEach(function (ke) {
+            if (!tujuan[ke].includes(peran)) return;
+            const btn = el("button", ke === "diterima" || ke === "berminat" ? "tombol-utama" : "tombol-halus", t("aksiMatch." + ke));
+            btn.type = "button";
+            btn.addEventListener("click", function () { ubahStatus(ke); });
+            wadahAksi.appendChild(btn);
+        });
+    }
+
+    function ubahStatus(ke) {
+        postJSON(asal + "/api/match/" + encodeURIComponent(id) + "/status", { ke: ke }, function (hasil) {
+            if (!sehat(hasil, elPesan)) return;
+            muat();
+        }, ...tokenHeader());
+    }
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,207 @@
+<!DOCTYPE html>
+<html lang="id" data-judul="profil.judul_halaman">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Internal Talent Marketplace</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=Plus+Jakarta+Sans:wght@400..700&display=swap" rel="stylesheet">
+  <script src="/assets/js/prapasang.js"></script>
+  <link rel="stylesheet" href="/assets/css/app.css">
+</head>
+<body>
+
+<main class="mx-auto max-w-3xl px-5 py-6 space-y-5">
+  <div id="pesan" hidden role="alert"></div>
+
+  <section class="kartu p-6">
+    <h2 class="eyebrow text-tinta-redup mb-3" data-i18n="profil.kesediaan">Kesediaan dicocokkan</h2>
+    <p id="ketKesediaan" class="text-sm text-tinta-redup mb-3"></p>
+    <button type="button" id="tombolKesediaan" class="tombol-halus"></button>
+  </section>
+
+  <section class="kartu p-6">
+    <h2 class="eyebrow text-tinta-redup mb-4" data-i18n="profil.skill_saya">Skill saya</h2>
+    <div id="wadahTabel"></div>
+  </section>
+
+  <section class="kartu p-6">
+    <h2 class="eyebrow text-tinta-redup mb-4" data-i18n="profil.tambah_judul">Tambah atau perbarui skill</h2>
+    <div id="pesanForm" hidden role="alert"></div>
+    <form id="formSkill" class="grid gap-4 sm:grid-cols-2" novalidate>
+      <div class="sm:col-span-2">
+        <label for="selSkill" class="block text-sm font-medium mb-1.5" data-i18n="profil.pilih_skill">Pilih skill</label>
+        <select id="selSkill" class="medan" required></select>
+      </div>
+      <div>
+        <label for="selTingkat" class="block text-sm font-medium mb-1.5" data-i18n="profil.kolom_tingkat">Tingkat</label>
+        <select id="selTingkat" class="medan" required></select>
+      </div>
+      <div>
+        <label for="selSumber" class="block text-sm font-medium mb-1.5" data-i18n="profil.kolom_sumber">Sumber bukti</label>
+        <select id="selSumber" class="medan" required>
+          <option value="self" data-i18n="bukti.self">Klaim sendiri</option>
+          <option value="sertifikasi" data-i18n="bukti.sertifikasi">Sertifikasi</option>
+          <option value="atasan" data-i18n="bukti.atasan">Dikonfirmasi atasan</option>
+        </select>
+      </div>
+      <div class="sm:col-span-2">
+        <button type="submit" id="tombolSimpan" class="tombol-utama" data-i18n="profil.simpan_skill">Simpan skill</button>
+      </div>
+    </form>
+  </section>
+</main>
+
+<script type="module">
+import { getJSON, postJSON } from "/assets/js/jscroot/api.js";
+import { asal } from "/assets/js/config.js";
+import { requireLogin, requireRole, tokenHeader } from "/assets/js/auth.js";
+import { pesan, sembunyikan, sehat, el, kosongkan, lencana, tabel, baris, kosong } from "/assets/js/ui.js";
+import { t, bahasa } from "/assets/js/i18n.js";
+import { pasang } from "/assets/js/nav.js";
+
+if (requireLogin() && requireRole("K-01")) {
+    pasang("K-01");
+    const elPesan = document.getElementById("pesan");
+    const elPesanForm = document.getElementById("pesanForm");
+    const elKet = document.getElementById("ketKesediaan");
+    const btnKesediaan = document.getElementById("tombolKesediaan");
+    const wadahTabel = document.getElementById("wadahTabel");
+    const selSkill = document.getElementById("selSkill");
+    const selTingkat = document.getElementById("selTingkat");
+    const form = document.getElementById("formSkill");
+    const tombolSimpan = document.getElementById("tombolSimpan");
+
+    let skillMap = {};   // kode -> {nama:{id,en}, kelompok}
+    let terbukaSaatIni = true;
+
+    function namaSkill(kode) {
+        const s = skillMap[kode];
+        if (!s) return kode;
+        const b = bahasa();
+        return (s.nama[b] || s.nama.id || kode) + " (" + kode + ")";
+    }
+
+    function gambarKesediaan(terbuka) {
+        terbukaSaatIni = terbuka;
+        elKet.textContent = t(terbuka ? "profil.kesediaan_aktif" : "profil.kesediaan_nonaktif");
+        btnKesediaan.textContent = t(terbuka ? "profil.kesediaan_toggle_tutup" : "profil.kesediaan_toggle_buka");
+    }
+
+    function gambarTabel(daftar) {
+        kosongkan(wadahTabel);
+        const { wadah, tbody } = tabel([
+            t("profil.kolom_skill"), t("profil.kolom_tingkat"), t("profil.kolom_sumber"),
+            t("profil.kolom_tanggal"), t("profil.kolom_aksi"),
+        ]);
+        if (!daftar.length) {
+            tbody.appendChild(kosong(5, t("umum.tidak_ada_data")));
+        } else {
+            daftar.forEach(function (p) {
+                const btnHapus = el("button", "tombol-halus", t("umum.hapus"));
+                btnHapus.type = "button";
+                btnHapus.addEventListener("click", function () { hapusSkill(p.kode); });
+                const tgl = new Date(p.tanggal);
+                tbody.appendChild(baris([
+                    namaSkill(p.kode),
+                    t("tingkat." + p.tingkat),
+                    lencana(t("bukti." + p.sumber_bukti), p.sumber_bukti === "usulan_ai" ? "tinjau" : "netral"),
+                    isNaN(tgl) ? "" : tgl.toLocaleDateString(bahasa() === "en" ? "en-GB" : "id-ID"),
+                    btnHapus,
+                ]));
+            });
+        }
+        wadahTabel.appendChild(wadah);
+    }
+
+    function muatProfil() {
+        getJSON(asal + "/api/saya/profil", function (hasil) {
+            if (!sehat(hasil, elPesan)) return;
+            const d = hasil.data.data || {};
+            gambarKesediaan(!!(d.karyawan && d.karyawan.terbuka));
+            gambarTabel(d.profil_skill || []);
+        }, ...tokenHeader());
+    }
+
+    function muatSkill() {
+        getJSON(asal + "/api/skill", function (hasil) {
+            if (!sehat(hasil, elPesan)) return;
+            const d = hasil.data.data || {};
+            const daftar = d.skill || [];
+            skillMap = {};
+            daftar.forEach(function (s) { skillMap[s.kode] = s; });
+            kosongkan(selSkill);
+            if (!daftar.length) {
+                selSkill.appendChild(el("option", "", t("profil.taksonomi_kosong")));
+                selSkill.disabled = true;
+                tombolSimpan.disabled = true;
+            } else {
+                const porKelompok = {};
+                (d.kelompok || []).forEach(function (k) { porKelompok[k.kode] = []; });
+                daftar.forEach(function (s) { (porKelompok[s.kelompok] = porKelompok[s.kelompok] || []).push(s); });
+                (d.kelompok || []).forEach(function (k) {
+                    const grup = document.createElement("optgroup");
+                    grup.label = (k.nama[bahasa()] || k.nama.id);
+                    (porKelompok[k.kode] || []).forEach(function (s) {
+                        const opt = document.createElement("option");
+                        opt.value = s.kode;
+                        opt.textContent = (s.nama[bahasa()] || s.nama.id) + " (" + s.kode + ")";
+                        grup.appendChild(opt);
+                    });
+                    selSkill.appendChild(grup);
+                });
+            }
+            kosongkan(selTingkat);
+            [1, 2, 3, 4].forEach(function (n) {
+                const opt = document.createElement("option");
+                opt.value = String(n);
+                opt.textContent = t("tingkat." + n);
+                selTingkat.appendChild(opt);
+            });
+            // Skill baru saja bisa berubah nama tampilan (bahasa); tabel yang
+            // sudah dimuat perlu digambar ulang dengan peta terbaru.
+            muatProfil();
+        }, ...tokenHeader());
+    }
+
+    function hapusSkill(kode) {
+        if (!window.confirm(t("profil.hapus_konfirmasi"))) return;
+        const req = new Headers();
+        const [kunci, nilai] = tokenHeader();
+        req.append(kunci, nilai);
+        fetch(asal + "/api/saya/profil-skill/" + encodeURIComponent(kode), { method: "DELETE", headers: req })
+            .then(function (r) { return r.json().then(function (data) { return { status: r.status, data: data }; }); })
+            .then(function (hasil) { if (sehat(hasil, elPesan)) muatProfil(); })
+            .catch(function () { pesan(elPesan, t("galat.tanpa_jawaban"), "galat"); });
+    }
+
+    btnKesediaan.addEventListener("click", function () {
+        btnKesediaan.disabled = true;
+        postJSON(asal + "/api/saya/visibilitas", { terbuka: !terbukaSaatIni }, function (hasil) {
+            btnKesediaan.disabled = false;
+            if (!sehat(hasil, elPesan)) return;
+            gambarKesediaan(!terbukaSaatIni);
+        }, ...tokenHeader());
+    });
+
+    form.addEventListener("submit", function (e) {
+        e.preventDefault();
+        sembunyikan(elPesanForm);
+        tombolSimpan.disabled = true;
+        postJSON(asal + "/api/saya/profil-skill", {
+            kode: selSkill.value, tingkat: Number(selTingkat.value), sumber_bukti: selSumberNilai(),
+        }, function (hasil) {
+            tombolSimpan.disabled = false;
+            if (!sehat(hasil, elPesanForm)) return;
+            muatProfil();
+        }, ...tokenHeader());
+    });
+
+    function selSumberNilai() { return document.getElementById("selSumber").value; }
+
+    muatSkill();
+}
+</script>
+</body>
+</html>

@@ -32,6 +32,54 @@ export function kosongkan(elemen) {
     while (elemen && elemen.firstChild) elemen.removeChild(elemen.firstChild);
 }
 
+// lencana adalah pil status kecil (match/tugas/tepi/aturan/siklus). jenis:
+// "sah" | "galat" | "tinjau" | "netral".
+export function lencana(teks, jenis) {
+    const warna = jenis === "sah" ? "bg-sah-muda text-sah"
+        : jenis === "galat" ? "bg-galat-muda text-galat"
+        : jenis === "tinjau" ? "bg-tinjau-muda text-tinjau"
+        : "bg-latar text-tinta-redup";
+    return el("span", "inline-flex items-center rounded-full px-2.5 py-1 text-mikro font-medium " + warna, teks);
+}
+
+// tabel membangun <table class="w-full text-sm"><thead>…</thead><tbody></tbody></table>
+// dari label kolom (array of string); mengembalikan {wadah, tbody} — baris
+// ditambahkan lewat tbody.appendChild(baris(...)).
+export function tabel(kolomLabel) {
+    const bungkus = el("div", "overflow-x-auto");
+    const t = el("table", "w-full text-sm");
+    const thead = el("thead");
+    const tr = el("tr", "border-b border-garis text-left text-tinta-redup");
+    kolomLabel.forEach(function (l) { tr.appendChild(el("th", "py-2 pr-4 font-medium", l)); });
+    thead.appendChild(tr);
+    const tbody = el("tbody");
+    t.appendChild(thead);
+    t.appendChild(tbody);
+    bungkus.appendChild(t);
+    return { wadah: bungkus, tbody: tbody };
+}
+
+// baris membuat <tr> dari sel — tiap sel string (textContent) atau Node
+// (disisipkan apa adanya, misalnya lencana() atau <a>).
+export function baris(sel) {
+    const tr = el("tr", "border-b border-garis-tipis last:border-0");
+    sel.forEach(function (s) {
+        const td = el("td", "py-2 pr-4 align-top");
+        if (s instanceof Node) td.appendChild(s); else if (s != null) td.textContent = String(s);
+        tr.appendChild(td);
+    });
+    return tr;
+}
+
+// kosong adalah baris "tidak ada data" yang merentang seluruh kolom.
+export function kosong(nKolom, teks) {
+    const tr = el("tr");
+    const td = el("td", "py-4 text-tinta-redup text-center", teks);
+    td.colSpan = nKolom;
+    tr.appendChild(td);
+    return tr;
+}
+
 // teksGalat menerjemahkan balasan galat lewat `code`; `message` backend hanya
 // cadangan kalau kodenya belum ada di kamus.
 export function teksGalat(hasil) {

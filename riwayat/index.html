@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="id" data-judul="riwayat.judul_halaman">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Internal Talent Marketplace</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=Plus+Jakarta+Sans:wght@400..700&display=swap" rel="stylesheet">
+  <script src="/assets/js/prapasang.js"></script>
+  <link rel="stylesheet" href="/assets/css/app.css">
+</head>
+<body>
+
+<main class="mx-auto max-w-4xl px-5 py-6 space-y-5">
+  <div id="pesan" hidden role="alert"></div>
+  <section class="kartu p-6">
+    <h2 class="eyebrow text-tinta-redup mb-4" data-i18n="riwayat.daftar">Riwayat keputusan</h2>
+    <div id="wadahTabel"></div>
+  </section>
+</main>
+
+<script type="module">
+import { getJSON } from "/assets/js/jscroot/api.js";
+import { asal } from "/assets/js/config.js";
+import { requireLogin, requireRole, tokenHeader } from "/assets/js/auth.js";
+import { sehat, el, kosongkan, lencana, tabel, baris, kosong } from "/assets/js/ui.js";
+import { t, bahasa } from "/assets/js/i18n.js";
+import { pasang } from "/assets/js/nav.js";
+
+if (requireLogin() && requireRole("K-05")) {
+    pasang("K-05");
+    const elPesan = document.getElementById("pesan");
+    const wadahTabel = document.getElementById("wadahTabel");
+
+    function jenisMatch(status) {
+        if (status === "diterima" || status === "berminat") return "sah";
+        if (status === "ditolak" || status === "tidak_berminat" || status === "tidak_direkomendasikan") return "netral";
+        if (status === "ditinjau") return "tinjau";
+        return "netral";
+    }
+
+    getJSON(asal + "/api/saya/riwayat", function (hasil) {
+        if (!sehat(hasil, elPesan)) return;
+        const daftar = hasil.data.data || [];
+        kosongkan(wadahTabel);
+        const { wadah, tbody } = tabel([
+            t("riwayat.kolom_siklus"), t("riwayat.kolom_peluang"), t("rekomendasi.kolom_skor"),
+            t("riwayat.kolom_status"), t("umum.tanggal"), "",
+        ]);
+        if (!daftar.length) {
+            tbody.appendChild(kosong(6, t("umum.tidak_ada_data")));
+        } else {
+            daftar.forEach(function (m) {
+                const a = el("a", "text-utama hover:underline text-sm", t("rekomendasi.lihat_penjelasan"));
+                a.href = "/penjelasan/?id=" + encodeURIComponent(m.id);
+                const tgl = new Date(m.dibuat);
+                tbody.appendChild(baris([
+                    m.siklus.nama, m.peluang.judul, Math.round(m.skor * 10) / 10,
+                    lencana(t("status.match." + m.status), jenisMatch(m.status)),
+                    isNaN(tgl) ? "" : tgl.toLocaleDateString(bahasa() === "en" ? "en-GB" : "id-ID"),
+                    a,
+                ]));
+            });
+        }
+        wadahTabel.appendChild(wadah);
+    }, ...tokenHeader());
+}
+</script>
+</body>
+</html>

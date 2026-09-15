@@ -1,0 +1,253 @@
+<!DOCTYPE html>
+<html lang="id" data-judul="usulanSkill.judul_halaman">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Internal Talent Marketplace</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=Plus+Jakarta+Sans:wght@400..700&display=swap" rel="stylesheet">
+  <script src="/assets/js/prapasang.js"></script>
+  <link rel="stylesheet" href="/assets/css/app.css">
+</head>
+<body>
+
+<main class="mx-auto max-w-3xl px-5 py-6 space-y-5">
+  <div id="pesan" hidden role="alert"></div>
+
+  <section class="kartu p-6">
+    <h2 class="eyebrow text-tinta-redup mb-2" data-i18n="usulanSkill.tempel_judul">Tempel teks pengalaman Anda</h2>
+    <p class="text-sm text-tinta-redup mb-4" data-i18n="usulanSkill.tempel_ket">AI membaca teks ini dan mengusulkan skill dengan kutipan buktinya. Anda memutuskan setiap usulan sebelum masuk profil.</p>
+    <form id="formTeks" class="space-y-4" novalidate>
+      <div>
+        <textarea id="teks" class="medan" rows="6" required></textarea>
+      </div>
+      <div class="flex items-center gap-4">
+        <label class="text-sm font-medium" for="selBahasa" data-i18n="usulanSkill.bahasa_teks">Bahasa teks ini</label>
+        <select id="selBahasa" class="medan w-auto">
+          <option value="id">Indonesia</option>
+          <option value="en">English</option>
+        </select>
+        <button type="submit" id="tombolKirim" class="tombol-utama ml-auto" data-i18n="umum.kirim">Kirim</button>
+      </div>
+    </form>
+    <div id="status" class="mt-4 text-sm text-tinta-redup" hidden></div>
+    <div id="hasilBaru" class="mt-4" hidden></div>
+  </section>
+
+  <section class="kartu p-6">
+    <h2 class="eyebrow text-tinta-redup mb-4" data-i18n="usulanSkill.riwayat">Riwayat usulan</h2>
+    <div id="riwayat" class="space-y-6"></div>
+  </section>
+</main>
+
+<script type="module">
+import { getJSON, postJSON } from "/assets/js/jscroot/api.js";
+import { asal } from "/assets/js/config.js";
+import { requireLogin, requireRole, tokenHeader } from "/assets/js/auth.js";
+import { pesan, sembunyikan, sehat, el, kosongkan, lencana } from "/assets/js/ui.js";
+import { t, bahasa } from "/assets/js/i18n.js";
+import { pasang } from "/assets/js/nav.js";
+
+if (requireLogin() && requireRole("K-02")) {
+    pasang("K-02");
+    const elPesan = document.getElementById("pesan");
+    const form = document.getElementById("formTeks");
+    const elTeks = document.getElementById("teks");
+    const elBahasa = document.getElementById("selBahasa");
+    const tombolKirim = document.getElementById("tombolKirim");
+    const elStatus = document.getElementById("status");
+    const elHasilBaru = document.getElementById("hasilBaru");
+    const elRiwayat = document.getElementById("riwayat");
+
+    let skillMap = {};
+    elBahasa.value = bahasa();
+
+    function namaSkill(kode) {
+        const s = skillMap[kode];
+        if (!s) return kode;
+        return (s.nama[bahasa()] || s.nama.id || kode) + " (" + kode + ")";
+    }
+
+    // potongTeks memecah teks sumber menjadi bagian tersorot (kutipan butir)
+    // dan bagian biasa, berurut sesuai posisi — dipakai HANYA untuk usulan
+    // yang baru saja dibuat di sesi ini (teks sumber tidak pernah disimpan
+    // server, §9.6 rencana).
+    function potongTeks(teks, butir) {
+        const urut = butir.slice().sort(function (a, b) { return a.posisi_mulai - b.posisi_mulai; });
+        const potongan = [];
+        let kursor = 0;
+        urut.forEach(function (b) {
+            if (b.posisi_mulai > kursor) potongan.push({ teks: teks.slice(kursor, b.posisi_mulai), sorot: false });
+            potongan.push({ teks: teks.slice(b.posisi_mulai, b.posisi_selesai), sorot: true });
+            kursor = b.posisi_selesai;
+        });
+        if (kursor < teks.length) potongan.push({ teks: teks.slice(kursor), sorot: false });
+        return potongan;
+    }
+
+    function gambarTeksTersorot(wadah, teks, butir) {
+        const p = el("p", "text-sm leading-relaxed whitespace-pre-wrap");
+        potongTeks(teks, butir).forEach(function (bagian) {
+            if (bagian.sorot) {
+                const mark = document.createElement("mark");
+                mark.className = "bg-utama-muda text-utama rounded px-0.5";
+                mark.textContent = bagian.teks;
+                p.appendChild(mark);
+            } else {
+                p.appendChild(document.createTextNode(bagian.teks));
+            }
+        });
+        wadah.appendChild(p);
+    }
+
+    function statusLencana(st) {
+        const jenis = st === "diterima" ? "sah" : st === "ditolak" ? "galat" : st === "diubah" ? "sah" : "tinjau";
+        return lencana(t("status.usulan." + st), jenis);
+    }
+
+    // gambarButir merender satu butir usulan: nama skill, tingkat perkiraan,
+    // status, dan (bila belum diputuskan) tombol terima/ubah/tolak.
+    function gambarButir(usulanId, b, muatUlang) {
+        const baris = el("div", "flex flex-wrap items-center gap-2 py-2 border-b border-garis-tipis last:border-0");
+        baris.appendChild(el("span", "font-medium", namaSkill(b.kode)));
+        baris.appendChild(el("span", "text-tinta-redup text-sm", t("tingkat." + b.tingkat_perkiraan)));
+        baris.appendChild(statusLencana(b.status));
+        if (b.status === "usulan") {
+            const btnTerima = el("button", "tombol-halus", t("usulanSkill.terima"));
+            btnTerima.type = "button";
+            btnTerima.addEventListener("click", function () { putuskan(usulanId, b.kode, "diterima", null, muatUlang); });
+            const btnTolak = el("button", "tombol-halus", t("usulanSkill.tolak"));
+            btnTolak.type = "button";
+            btnTolak.addEventListener("click", function () { putuskan(usulanId, b.kode, "ditolak", null, muatUlang); });
+            const selUbah = document.createElement("select");
+            selUbah.className = "medan w-auto text-sm";
+            [1, 2, 3, 4].forEach(function (n) {
+                const opt = document.createElement("option");
+                opt.value = String(n);
+                opt.textContent = t("tingkat." + n);
+                if (n === b.tingkat_perkiraan) opt.selected = true;
+                selUbah.appendChild(opt);
+            });
+            const btnUbah = el("button", "tombol-halus", t("usulanSkill.ubah_tingkat"));
+            btnUbah.type = "button";
+            btnUbah.addEventListener("click", function () { putuskan(usulanId, b.kode, "diubah", Number(selUbah.value), muatUlang); });
+            baris.appendChild(btnTerima);
+            baris.appendChild(selUbah);
+            baris.appendChild(btnUbah);
+            baris.appendChild(btnTolak);
+        } else if (b.tingkat_diputuskan) {
+            baris.appendChild(el("span", "text-tinta-redup text-sm", "→ " + t("tingkat." + b.tingkat_diputuskan)));
+        }
+        return baris;
+    }
+
+    function putuskan(usulanId, kode, keputusan, tingkat, muatUlang) {
+        const badan = { kode: kode, keputusan: keputusan };
+        if (tingkat != null) badan.tingkat = tingkat;
+        postJSON(asal + "/api/usulan-skill/" + usulanId + "/putuskan", badan, function (hasil) {
+            if (!sehat(hasil, elPesan)) return;
+            muatUlang();
+        }, ...tokenHeader());
+    }
+
+    function gambarUsulanRingkas(u) {
+        const kartu = el("div", "");
+        const kepala = el("div", "flex items-center justify-between mb-2");
+        const tgl = new Date(u.dibuat || u.created_at);
+        kepala.appendChild(el("span", "text-mikro text-tinta-redup", isNaN(tgl) ? "" : tgl.toLocaleString(bahasa() === "en" ? "en-GB" : "id-ID")));
+        kartu.appendChild(kepala);
+        const wadahButir = el("div", "");
+        (u.butir || []).forEach(function (b) { wadahButir.appendChild(gambarButir(u.id, b, muatRiwayat)); });
+        if (!(u.butir || []).length) wadahButir.appendChild(el("p", "text-sm text-tinta-redup", t("usulanSkill.tanpa_butir")));
+        kartu.appendChild(wadahButir);
+        return kartu;
+    }
+
+    function muatRiwayat() {
+        getJSON(asal + "/api/saya/usulan-skill?limit=20", function (hasil) {
+            if (!sehat(hasil, elPesan)) return;
+            const daftar = hasil.data.data || [];
+            kosongkan(elRiwayat);
+            if (!daftar.length) {
+                elRiwayat.appendChild(el("p", "text-sm text-tinta-redup", t("umum.tidak_ada_data")));
+            } else {
+                daftar.forEach(function (u) { elRiwayat.appendChild(gambarUsulanRingkas(u)); });
+            }
+        }, ...tokenHeader());
+    }
+
+    function muatSkill(lanjut) {
+        getJSON(asal + "/api/skill", function (hasil) {
+            if (!sehat(hasil, elPesan)) return;
+            (hasil.data.data.skill || []).forEach(function (s) { skillMap[s.kode] = s; });
+            if (lanjut) lanjut();
+        }, ...tokenHeader());
+    }
+
+    function tungguTugas(tugasId, sisaPercobaan, padaSelesai) {
+        getJSON(asal + "/api/tugas-ai/" + tugasId, function (hasil) {
+            if (!sehat(hasil, elPesan)) return;
+            const tugas = hasil.data.data;
+            if (tugas.status === "selesai") {
+                elStatus.hidden = true;
+                padaSelesai(tugas);
+            } else if (tugas.status === "gagal") {
+                elStatus.textContent = t("usulanSkill.gagal");
+                elStatus.hidden = false;
+            } else if (sisaPercobaan <= 0) {
+                elStatus.textContent = t("usulanSkill.masih_diproses");
+                elStatus.hidden = false;
+            } else {
+                elStatus.textContent = t("usulanSkill.diproses");
+                elStatus.hidden = false;
+                setTimeout(function () { tungguTugas(tugasId, sisaPercobaan - 1, padaSelesai); }, 1500);
+            }
+        }, ...tokenHeader());
+    }
+
+    form.addEventListener("submit", function (e) {
+        e.preventDefault();
+        sembunyikan(elPesan);
+        elHasilBaru.hidden = true;
+        kosongkan(elHasilBaru);
+        const teksDikirim = elTeks.value;
+        tombolKirim.disabled = true;
+        postJSON(asal + "/api/saya/usulan-skill", { teks: teksDikirim, bahasa: elBahasa.value }, function (hasil) {
+            tombolKirim.disabled = false;
+            if (!sehat(hasil, elPesan)) return;
+            const tugas = hasil.data.data;
+            tungguTugas(tugas.id, 20, function (tugasSelesai) {
+                getJSON(asal + "/api/saya/usulan-skill?limit=5", function (hasilDaftar) {
+                    if (!sehat(hasilDaftar, elPesan)) return;
+                    const u = (hasilDaftar.data.data || []).find(function (x) { return x.id === tugasSelesai.hasil_id; });
+                    if (!u) return;
+                    kosongkan(elHasilBaru);
+                    elHasilBaru.appendChild(el("h3", "font-medium mb-2", t("usulanSkill.hasil_baru")));
+                    gambarTeksTersorot(elHasilBaru, teksDikirim, u.butir || []);
+                    const wadahButir = el("div", "mt-3");
+                    (u.butir || []).forEach(function (b) { wadahButir.appendChild(gambarButir(u.id, b, function () { muatRiwayat(); muatUlangHasilBaru(u.id); })); });
+                    elHasilBaru.appendChild(wadahButir);
+                    elHasilBaru.hidden = false;
+                    muatRiwayat();
+
+                    function muatUlangHasilBaru(usulanId) {
+                        getJSON(asal + "/api/saya/usulan-skill?limit=5", function (h2) {
+                            if (!sehat(h2, elPesan)) return;
+                            const u2 = (h2.data.data || []).find(function (x) { return x.id === usulanId; });
+                            if (!u2) return;
+                            const wadahLama = elHasilBaru.querySelector("div.mt-3");
+                            if (wadahLama) kosongkan(wadahLama);
+                            (u2.butir || []).forEach(function (b) { wadahLama.appendChild(gambarButir(u2.id, b, function () { muatRiwayat(); muatUlangHasilBaru(usulanId); })); });
+                        }, ...tokenHeader());
+                    }
+                }, ...tokenHeader());
+            });
+        }, ...tokenHeader());
+    });
+
+    muatSkill(function () { muatRiwayat(); });
+}
+</script>
+</body>
+</html>

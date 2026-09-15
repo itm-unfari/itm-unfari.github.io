@@ -83,35 +83,42 @@ try {
     }
 
     // ── 2. Penjaga halaman ──
+    //
+    // Peran HR (2), bukan karyawan (4): sejak K-01 tersedia, tujuanSetelahMasuk()
+    // karyawan mendarat di /profil/ (bukan /akun/), dan halaman itu memanggil
+    // /api/saya/profil + /api/skill yang tidak dijawab API tiruan berkas ini
+    // (khusus **/auth/** dan **/health, lihat header berkas). HR belum
+    // punya layar tersedia, jadi tetap mendarat di /akun/ — mekanisme
+    // penjagaan/pengalihan yang diuji di sini generik lintas peran.
     {
         const { ctx, page } = await halamanBaru();
-        await pasangApiTiruan(page, penjawabBaku(pengguna(4)));
+        await pasangApiTiruan(page, penjawabBaku(pengguna(2)));
         await page.goto(FE + "/akun/", { waitUntil: "commit" }).catch(() => {});
         await page.waitForURL("**/login/**", { timeout: 8000 }).catch(() => {});
         p.lapor("/akun/ tanpa sesi dilempar ke /login/", jalurDari(page.url()) === "/login/", page.url());
-        await pasangSesi(page, pengguna(4));
+        await pasangSesi(page, pengguna(2));
         await page.goto(FE + "/login/", { waitUntil: "commit" }).catch(() => {});
         await page.waitForURL("**/akun/**", { timeout: 8000 }).catch(() => {});
         p.lapor("/login/ dengan sesi dilempar ke /akun/", jalurDari(page.url()) === "/akun/", page.url());
         await ctx.close();
     }
 
-    // ── 3. Masuk berhasil, header token, alamat backend ──
+    // ── 3. Masuk berhasil, header token, alamat backend ── (peran HR, lihat catatan §2)
     {
         const { ctx, page, galat } = await halamanBaru();
-        const dicatat = await pasangApiTiruan(page, penjawabBaku(pengguna(4), "token-uji-123"));
+        const dicatat = await pasangApiTiruan(page, penjawabBaku(pengguna(2), "token-uji-123"));
         await page.goto(FE + "/login/", { waitUntil: "networkidle" });
-        await page.fill("#uname", "uji.karyawan");
+        await page.fill("#uname", "uji.hr");
         await page.fill("#password", SANDI_UJI);
         await page.click("#tombolMasuk");
         await page.waitForURL("**/akun/**", { timeout: 10000 }).catch(() => {});
         p.lapor("masuk berhasil diarahkan ke /akun/", jalurDari(page.url()) === "/akun/", page.url());
         const sesi = await bacaSesi(page);
         p.lapor("localStorage.itm_token terisi token dari balasan", sesi.token === "token-uji-123", String(sesi.token));
-        p.lapor("localStorage.itm_user terisi pengguna dari balasan", !!sesi.user && JSON.parse(sesi.user).uname === "uji.karyawan");
+        p.lapor("localStorage.itm_user terisi pengguna dari balasan", !!sesi.user && JSON.parse(sesi.user).uname === "uji.hr");
         await page.waitForFunction(() => document.getElementById("uname").textContent.length > 0, null, { timeout: 8000 }).catch(() => {});
-        p.lapor("/akun/ menampilkan uname dari /auth/me", (await page.locator("#uname").textContent()) === "uji.karyawan");
-        p.lapor("/akun/ menampilkan peran dari kamus (peran.4)", (await page.locator("#peran").textContent()) === id["peran.4"]);
+        p.lapor("/akun/ menampilkan uname dari /auth/me", (await page.locator("#uname").textContent()) === "uji.hr");
+        p.lapor("/akun/ menampilkan peran dari kamus (peran.2)", (await page.locator("#peran").textContent()) === id["peran.2"]);
         p.lapor("pita data sintetis ada di /akun/", await page.locator('[data-uji="pita-sintetis"]').isVisible());
         p.lapor("kepala halaman memuat judul layar U-02", (await page.locator("header h1").textContent()) === id["layar.U-02"]);
 
@@ -119,7 +126,7 @@ try {
         const me = dicatat.find((r) => r.jalur === "/auth/me");
         let badan = {};
         try { badan = JSON.parse(masuk.badan || "{}"); } catch (e) { /* dilaporkan di bawah */ }
-        p.lapor("/auth/login dipanggil lewat POST dengan uname & password", !!masuk && masuk.method === "POST" && badan.uname === "uji.karyawan" && badan.password === SANDI_UJI);
+        p.lapor("/auth/login dipanggil lewat POST dengan uname & password", !!masuk && masuk.method === "POST" && badan.uname === "uji.hr" && badan.password === SANDI_UJI);
         p.lapor("/auth/login TIDAK membawa header login", !!masuk && masuk.headers.login === undefined, masuk ? JSON.stringify(masuk.headers.login) : "tidak ada permintaan");
         p.lapor("/auth/me membawa header login = token", !!me && me.headers.login === "token-uji-123", me ? JSON.stringify(me.headers.login) : "tidak ada permintaan");
         const asal = [...new Set(dicatat.map((r) => new URL(r.url).origin))];
@@ -313,13 +320,13 @@ try {
 
     // ── 10. Mode pakar dan nav per peran ──
     //
-    // Saat ini hanya U-02 yang tersedia untuk semua peran, jadi layarUntuk()
-    // menghasilkan satu tautan dan pasang() tidak membuat <nav>. Pemeriksaan
-    // "tidak ada <nav>" INI AKAN BERUBAH saat layar lain dinyatakan tersedia
-    // di layar.js: perbarui harapannya (atau andalkan pemeriksaan turunan di
-    // bawahnya yang membaca layar.js).
+    // Jumlah layar tersedia tumbuh seiring pembangunan (banyak layar dibangun
+    // paralel), jadi pemeriksaan di sini TIDAK menghardcode daftar kode:
+    // ia membaca layar.js lewat layarUntuk() saat uji berjalan (baris di
+    // bawah), supaya menambah layar baru tidak pernah membuat berkas ini
+    // basi. Yang dipastikan tetap: U-01/U-02 selalu ada (dasar login+akun).
     const tersedia = LAYAR.filter((l) => l.tersedia).map((l) => l.kode);
-    p.lapor("keadaan saat ini: hanya U-01 dan U-02 yang tersedia (perbarui uji nav bila berubah)", tersedia.join(",") === "U-01,U-02", tersedia.join(","));
+    p.lapor("U-01 dan U-02 selalu tersedia (dasar login dan akun)", tersedia.includes("U-01") && tersedia.includes("U-02"), tersedia.join(","));
     for (const role of SEMUA_PERAN) {
         const { ctx, page, galat } = await halamanBaru();
         await pasangApiTiruan(page, penjawabBaku(pengguna(role)));

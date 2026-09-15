@@ -6,7 +6,7 @@
 import { redirect } from "./jscroot/url.js";
 import { postJSON } from "./jscroot/api.js";
 import { backend, tokenKey } from "./config.js";
-import { layarUntuk } from "./layar.js";
+import { layarUntuk, cariLayar } from "./layar.js";
 
 const KUNCI_TOKEN = "itm_token";
 const KUNCI_USER = "itm_user";
@@ -51,6 +51,20 @@ export function requireLogin() {
 
 export function requireGuest() {
     if (getToken()) {
+        redirect(tujuanSetelahMasuk());
+        return false;
+    }
+    return true;
+}
+
+// requireRole: panggil SETELAH requireLogin() di setiap layar berkode selain
+// U-01/U-02. Kenyamanan seperti requireLogin — backend tetap gerbang
+// sesungguhnya — tapi mencegah peran yang salah sempat melihat kerangka
+// halaman sebelum permintaan API pertama gagal 403.
+export function requireRole(kode) {
+    const u = getUser() || {};
+    const layar = cariLayar(kode);
+    if (!layar || !layar.peran.includes(u.role)) {
         redirect(tujuanSetelahMasuk());
         return false;
     }

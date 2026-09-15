@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="id" data-judul="rekomendasi.judul_halaman">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Internal Talent Marketplace</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=Plus+Jakarta+Sans:wght@400..700&display=swap" rel="stylesheet">
+  <script src="/assets/js/prapasang.js"></script>
+  <link rel="stylesheet" href="/assets/css/app.css">
+</head>
+<body>
+
+<main class="mx-auto max-w-4xl px-5 py-6 space-y-5">
+  <div id="pesan" hidden role="alert"></div>
+  <section class="kartu p-6">
+    <h2 class="eyebrow text-tinta-redup mb-4" data-i18n="rekomendasi.daftar">Peluang untuk Anda</h2>
+    <div id="wadahTabel"></div>
+  </section>
+</main>
+
+<script type="module">
+import { getJSON } from "/assets/js/jscroot/api.js";
+import { asal } from "/assets/js/config.js";
+import { requireLogin, requireRole, tokenHeader, getUser } from "/assets/js/auth.js";
+import { pesan, sehat, el, kosongkan, lencana, tabel, baris, kosong } from "/assets/js/ui.js";
+import { t } from "/assets/js/i18n.js";
+import { pasang } from "/assets/js/nav.js";
+import { PERAN } from "/assets/js/config.js";
+
+if (requireLogin() && requireRole("K-03")) {
+    pasang("K-03");
+    const elPesan = document.getElementById("pesan");
+    const wadahTabel = document.getElementById("wadahTabel");
+    const pakar = getUser().role === PERAN.PAKAR;
+
+    function jenisMatch(m) {
+        if (m.status === "diterima" || m.status === "berminat") return "sah";
+        if (m.status === "ditolak" || m.status === "tidak_berminat" || m.status === "tidak_direkomendasikan") return "netral";
+        if (m.status === "ditinjau") return "tinjau";
+        return "netral";
+    }
+
+    getJSON(asal + "/api/saya/rekomendasi" + (pakar ? "?karyawan_id=" + encodeURIComponent(new URLSearchParams(location.search).get("karyawan_id") || "") : ""), function (hasil) {
+        if (!sehat(hasil, elPesan)) return;
+        const d = hasil.data.data || {};
+        kosongkan(wadahTabel);
+        if (!d.siklus) {
+            wadahTabel.appendChild(el("p", "text-sm text-tinta-redup", t("rekomendasi.belum_ada_siklus")));
+            return;
+        }
+        const { wadah, tbody } = tabel([
+            t("rekomendasi.kolom_peluang"), t("rekomendasi.kolom_jenis"), t("rekomendasi.kolom_unit"),
+            t("rekomendasi.kolom_skor"), t("umum.aksi") + " / " + t("rekomendasi.kolom_status"), "",
+        ]);
+        const daftar = d.match || [];
+        if (!daftar.length) {
+            tbody.appendChild(kosong(6, t("rekomendasi.kosong")));
+        } else {
+            daftar.forEach(function (m) {
+                const a = el("a", "text-utama hover:underline text-sm", t("rekomendasi.lihat_penjelasan"));
+                a.href = "/penjelasan/?id=" + encodeURIComponent(m.id);
+                tbody.appendChild(baris([
+                    m.peluang.judul, t("jenis." + m.peluang.jenis), m.peluang.unit,
+                    Math.round(m.skor * 10) / 10,
+                    lencana(t("status.match." + m.status), jenisMatch(m)),
+                    a,
+                ]));
+            });
+        }
+        wadahTabel.appendChild(wadah);
+    }, ...tokenHeader());
+}
+</script>
+</body>
+</html>

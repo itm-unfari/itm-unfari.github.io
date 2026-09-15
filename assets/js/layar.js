@@ -12,11 +12,11 @@ export const LAYAR = [
     { kode: "U-01", url: "/login/", peran: SEMUA_PERAN, tersedia: true, tanpaNav: true },
     { kode: "U-02", url: "/akun/", peran: SEMUA_PERAN, tersedia: true },
 
-    { kode: "K-01", url: "/profil/", peran: [P.KARYAWAN], tersedia: false },
-    { kode: "K-02", url: "/usulan-skill/", peran: [P.KARYAWAN], tersedia: false },
-    { kode: "K-03", url: "/rekomendasi/", peran: [P.KARYAWAN], tersedia: false },
-    { kode: "K-04", url: "/penjelasan/", peran: [P.KARYAWAN], tersedia: false, tanpaNav: true },
-    { kode: "K-05", url: "/riwayat/", peran: [P.KARYAWAN], tersedia: false },
+    { kode: "K-01", url: "/profil/", peran: [P.KARYAWAN], tersedia: true },
+    { kode: "K-02", url: "/usulan-skill/", peran: [P.KARYAWAN], tersedia: true },
+    { kode: "K-03", url: "/rekomendasi/", peran: [P.KARYAWAN, P.PAKAR], tersedia: true },
+    { kode: "K-04", url: "/penjelasan/", peran: [P.KARYAWAN, P.MANAJER, P.PAKAR], tersedia: true, tanpaNav: true },
+    { kode: "K-05", url: "/riwayat/", peran: [P.KARYAWAN], tersedia: true },
 
     { kode: "M-01", url: "/peluang-unit/", peran: [P.MANAJER], tersedia: false },
     { kode: "M-02", url: "/kandidat/", peran: [P.MANAJER], tersedia: false, tanpaNav: true },

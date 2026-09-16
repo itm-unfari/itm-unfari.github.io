@@ -3,6 +3,17 @@
 import { chromium } from "playwright";
 
 const SITUS = "https://itm-unfari.github.io";
+
+// Sandi akun produksi TIDAK disimpan di repo ini: repo ini publik, dan backend
+// produksi terbuka di internet. Uji ini mengambilnya dari lingkungan; sandi uji
+// lokal (ujilokal123) sengaja tidak berlaku di sana.
+const AKUN = process.env.AKUN_PUBLIK || "uji.hr";
+const SANDI = process.env.SANDI_PUBLIK;
+if (!SANDI) {
+    console.error("SANDI_PUBLIK belum diatur. Ambil dari berkas akun produksi di luar repo, lalu:");
+    console.error("  SANDI_PUBLIK=… npm run publik");
+    process.exit(2);
+}
 const browser = await chromium.launch({ args: ["--no-sandbox"] });
 const ctx = await browser.newContext({ viewport: { width: 1280, height: 900 }, bypassCSP: false });
 const page = await ctx.newPage();
@@ -24,12 +35,12 @@ semua = lapor("halaman masuk bergaya (CSS terpasang)", latar !== "rgba(0, 0, 0, 
 const asalKlien = await page.evaluate(() => window.location.hostname);
 console.log("   host: " + asalKlien);
 
-await page.fill("#uname", "uji.hr");
-await page.fill("#password", "ujilokal123");
+await page.fill("#uname", AKUN);
+await page.fill("#password", SANDI);
 await page.click("#tombolMasuk");
 await page.waitForTimeout(6000);
 const pesanLayar = (await page.locator("#pesan").textContent().catch(() => "")) || "";
-semua = lapor("masuk sebagai uji.hr mendarat di layar kerjanya", !page.url().includes("/login/"), page.url() + " | pesan: " + pesanLayar.trim()) && semua;
+semua = lapor("masuk sebagai " + AKUN + " mendarat di layar kerjanya", !page.url().includes("/login/"), page.url() + " | pesan: " + pesanLayar.trim()) && semua;
 
 const token = await page.evaluate(() => localStorage.getItem("itm_token"));
 semua = lapor("token tersimpan dari backend produksi", !!token && token.length > 20) && semua;

@@ -34,7 +34,7 @@
 </main>
 
 <script type="module">
-import { getJSON } from "/assets/js/jscroot/api.js";
+import { getJSON } from "/assets/js/minta.js";
 import { asal } from "/assets/js/config.js";
 import { requireLogin, requireRole, tokenHeader } from "/assets/js/auth.js";
 import { sehat, el, kosongkan, tabel, baris, kosong } from "/assets/js/ui.js";
@@ -100,11 +100,16 @@ if (requireLogin() && requireRole("P-01")) {
 
     document.getElementById("hapusSudut").addEventListener("click", function () { hapusSudut(); gambarSudut(); });
 
+    // Balasan yang datang setelah pengguna berganti peluang diabaikan; tanpa
+    // ini tabel kandidat lama ikut tertambah di bawah yang baru.
+    let permintaan = 0;
     function muatKandidat(peluangId) {
         kosongkan(wadahKandidat);
+        const nomor = ++permintaan;
         if (!peluangId) return;
         getJSON(asal + "/api/peluang/" + encodeURIComponent(peluangId) + "/kandidat", function (hasil) {
             if (!sehat(hasil, elPesan)) return;
+            if (nomor !== permintaan) return;
             const daftar = (hasil.data.data.kandidat || []);
             const { wadah, tbody } = tabel([t("pakar.kolom_nama"), t("rekomendasi.kolom_unit"), t("pakar.kolom_jabatan"), ""]);
             if (!daftar.length) tbody.appendChild(kosong(4, t("umum.tidak_ada_data")));

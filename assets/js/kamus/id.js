@@ -212,10 +212,10 @@ export default {
     "riwayat.kolom_siklus": "Siklus",
     "riwayat.kolom_peluang": "Peluang",
     "riwayat.kolom_status": "Status",
+    "riwayat.kolom_kondisi": "Kondisi batas",
 
     "penjelasan.kondisi_judul": "Kondisi batas yang berlaku",
     "penjelasan.kondisi_versi": "Versi kondisi batas {versi}",
-    "penjelasan.kondisi_beda_versi": "Rekomendasi ini dibuat di bawah versi kondisi batas yang lebih lama; yang ditampilkan versi aktif saat ini ({versi}).",
     "pengguna.judul_halaman": "Pengguna — Internal Talent Marketplace",
     "pengguna.daftar": "Daftar akun",
     "pengguna.cari": "Cari nama pengguna atau nama",

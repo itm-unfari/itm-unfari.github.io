@@ -43,7 +43,6 @@
         <select id="selSumber" class="medan" required>
           <option value="self" data-i18n="bukti.self">Klaim sendiri</option>
           <option value="sertifikasi" data-i18n="bukti.sertifikasi">Sertifikasi</option>
-          <option value="atasan" data-i18n="bukti.atasan">Dikonfirmasi atasan</option>
         </select>
       </div>
       <div class="sm:col-span-2">
@@ -54,7 +53,7 @@
 </main>
 
 <script type="module">
-import { getJSON, postJSON } from "/assets/js/jscroot/api.js";
+import { getJSON, postJSON } from "/assets/js/minta.js";
 import { asal } from "/assets/js/config.js";
 import { requireLogin, requireRole, tokenHeader } from "/assets/js/auth.js";
 import { pesan, sembunyikan, sehat, el, kosongkan, lencana, tabel, baris, kosong } from "/assets/js/ui.js";

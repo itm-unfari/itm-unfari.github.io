@@ -359,6 +359,40 @@ try {
         await ctx.close();
     }
 
+    // ── 10b. Backend mati atau balasan bukan JSON ──
+    //
+    // jscroot/api.js menelan keduanya (console.log dan JSON.parse yang
+    // melempar di dalam .then), sehingga callback tidak pernah dipanggil:
+    // tombol tetap terkunci di "Memproses…" tanpa pesan. minta.js menjamin
+    // callback berjalan tepat sekali.
+    {
+        for (const kasus of [
+            { nama: "jaringan gagal", jawab: null, harap: () => id["galat.tanpa_jawaban"] },
+            { nama: "balasan bukan JSON (502 dari proksi)", jawab: { status: 502, badan: "<html>Bad Gateway</html>" }, harap: () => id["galat.http"].replace("{status}", "502") },
+            { nama: "balasan 200 bukan JSON", jawab: { status: 200, badan: "bukan json" }, harap: () => id["galat.jawaban_tak_dikenal"] },
+        ]) {
+            const { ctx, page, galat } = await halamanBaru();
+            await redamFont(page);
+            await page.route("**/auth/**", async (route) => {
+                if (route.request().method() === "OPTIONS") return route.fulfill({ status: 204, headers: { "access-control-allow-origin": "*", "access-control-allow-headers": "content-type, accept, login" } });
+                if (!kasus.jawab) return route.abort("failed");
+                return route.fulfill({ status: kasus.jawab.status, headers: { "content-type": "text/html", "access-control-allow-origin": "*" }, body: kasus.jawab.badan });
+            });
+            await page.goto(FE + "/login/", { waitUntil: "networkidle" });
+            await page.fill("#uname", "uji.karyawan");
+            await page.fill("#password", SANDI_UJI);
+            await page.click("#tombolMasuk");
+            await tungguPesan(page);
+            const teks = (await page.locator("#pesan").textContent()) || "";
+            p.lapor(`${kasus.nama}: pesan terbaca, bukan halaman menggantung`, teks === kasus.harap(), JSON.stringify(teks));
+            p.lapor(`${kasus.nama}: tombol masuk pulih (tidak terkunci di "Memproses…")`,
+                (await page.locator("#tombolMasuk").isEnabled()) && (await page.locator("#tombolMasuk").textContent()) === id["masuk.tombol"]);
+            p.lapor(`${kasus.nama}: tetap di /login/ tanpa sesi`, jalurDari(page.url()) === "/login/" && (await bacaSesi(page)).token === null);
+            tanpaGalat(kasus.nama, galat);
+            await ctx.close();
+        }
+    }
+
     // ── 11. XSS pada data talenta (§16.2): nama skill, judul peluang, kutipan usulan AI ──
     //
     // Kutipan AI tidak bisa disuntikkan lewat adaptor rekaman backend, jadi
@@ -386,15 +420,18 @@ try {
             "/api/peluang/p1/kandidat": () => ok({ siklus: { id: "s1", nama: X("Siklus"), status: "dijalankan" }, peluang, kandidat: [Object.assign({}, match, { karyawan: { id: "k1", nama: X("Nama"), unit: X("Unit"), jabatan: X("Jabatan") } })] }),
             "/api/grafik-skill": () => halamanPenuh([{ id: "t1", skill_a: "DAT-01", skill_b: "DAT-01", kemiripan: 0.9, lintas_kelompok: true, model_embedding: X("model"), versi_taksonomi: "v0", status: "usulan", dibuat: "2026-09-01T00:00:00Z" }]),
         };
+        // `harap` adalah medan khas layar itu: nama skill, judul peluang, atau
+        // kutipan usulan AI. Tanpa ini pemeriksaan lolos hanya karena SALAH SATU
+        // medan ber-HTML tergambar.
         const kasus = [
-            { peran: 4, jalur: "/profil/" },
-            { peran: 4, jalur: "/usulan-skill/" },
-            { peran: 4, jalur: "/rekomendasi/" },
-            { peran: 4, jalur: "/penjelasan/?id=m1" },
-            { peran: 2, jalur: "/detail-kandidat/?id=m1" },
-            { peran: 2, jalur: "/peluang/", buka: true },
-            { peran: 3, jalur: "/kandidat/?peluang=p1" },
-            { peran: 2, jalur: "/grafik-skill/" },
+            { peran: 4, jalur: "/profil/", harap: "Nama skill" },
+            { peran: 4, jalur: "/usulan-skill/", harap: "kutipan usulan AI" },
+            { peran: 4, jalur: "/rekomendasi/", harap: "Judul peluang" },
+            { peran: 4, jalur: "/penjelasan/?id=m1", harap: "Nama skill" },
+            { peran: 2, jalur: "/detail-kandidat/?id=m1", harap: "Nama skill" },
+            { peran: 2, jalur: "/peluang/", buka: true, harap: "Judul peluang" },
+            { peran: 3, jalur: "/kandidat/?peluang=p1", harap: "Judul peluang" },
+            { peran: 2, jalur: "/grafik-skill/", harap: "Nama skill" },
         ];
         for (const k of kasus) {
             const { ctx, page, galat } = await halamanBaru();
@@ -407,8 +444,12 @@ try {
                 await page.locator("main button").filter({ hasText: new RegExp(`^(${id["peluang.kelola"]}|${id["umum.detail"]})$`) }).first().click();
                 await page.waitForTimeout(800);
             }
-            const r = await page.evaluate(() => ({ img: document.querySelectorAll("img").length, xss: !!window.__xss, teks: document.body.textContent.includes("<img src=x") }));
-            p.lapor(`XSS ${k.jalur} (peran ${k.peran}): data ber-HTML tampil sebagai teks, tanpa <img>`, r.img === 0 && !r.xss && r.teks, JSON.stringify(r));
+            const r = await page.evaluate((harap) => ({
+                img: document.querySelectorAll("img").length,
+                xss: !!window.__xss,
+                teks: document.body.textContent.includes("<img src=x onerror=window.__xss=1>" + harap),
+            }), k.harap);
+            p.lapor(`XSS ${k.jalur} (peran ${k.peran}): "${k.harap}" ber-HTML tampil sebagai teks, tanpa <img>`, r.img === 0 && !r.xss && r.teks, JSON.stringify(r));
             tanpaGalat(`XSS ${k.jalur}`, galat);
             await ctx.close();
         }

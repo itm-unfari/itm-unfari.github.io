@@ -4,7 +4,7 @@
 // Konsekuensinya satu celah XSS berarti token tercuri, jadi seluruh frontend
 // tidak memakai innerHTML untuk data, tanpa eval, dan pustaka di-vendor.
 import { redirect } from "./jscroot/url.js";
-import { postJSON } from "./jscroot/api.js";
+import { postJSON } from "./minta.js";
 import { backend, tokenKey } from "./config.js";
 import { layarUntuk, cariLayar } from "./layar.js";
 

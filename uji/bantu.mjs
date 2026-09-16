@@ -211,8 +211,11 @@ export async function layarLangsung(peranPaksa) {
     const rekom = (await apiJSON(sesi[PERAN.KARYAWAN].token, "/api/saya/rekomendasi")).data || {};
     const m = (rekom.match || [])[0] || {};
     const peluangManajer = ((await apiJSON(sesi[PERAN.MANAJER].token, "/api/peluang?status=terbuka")).data || [])[0] || {};
+    if (!m.id || !m.karyawan_id || !peluangManajer.id) {
+        throw new Error(`data backend belum siap untuk layar berparameter: match=${m.id || "-"} karyawan=${m.karyawan_id || "-"} peluang manajer=${peluangManajer.id || "-"}. Bangkitkan ulang data generator.`);
+    }
     const param = {
-        "K-03": peranPaksa === PERAN.PAKAR ? "?karyawan_id=" + encodeURIComponent(m.karyawan_id || "") : "",
+        "K-03": peranPaksa === PERAN.PAKAR ? "?karyawan_id=" + encodeURIComponent(m.karyawan_id) : "",
         "K-04": "?id=" + encodeURIComponent(m.id || ""),
         "H-02": "?id=" + encodeURIComponent(m.id || ""),
         "M-02": "?peluang=" + encodeURIComponent(peluangManajer.id || ""),

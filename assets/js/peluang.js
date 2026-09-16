@@ -1,7 +1,7 @@
 // Layar peluang bersama: M-01 (manajer, unit terkunci ke unitnya) dan H-03
 // (HR, semua unit). Selain HR dan manajer — termasuk pakar — hanya membaca:
 // kendali tulis tidak dibangun sama sekali, bukan sekadar disembunyikan.
-import { getJSON, postJSON } from "/assets/js/jscroot/api.js";
+import { getJSON, postJSON } from "/assets/js/minta.js";
 import { asal, PERAN } from "/assets/js/config.js";
 import { tokenHeader, getUser } from "/assets/js/auth.js";
 import { pesan, sembunyikan, sehat, el, kosongkan, lencana, tabel, baris, kosong } from "/assets/js/ui.js";
@@ -224,10 +224,15 @@ export function pasangLayarPeluang(opsi) {
     }
 
     // ── detail ──
+    // Nomor permintaan: klik cepat pada dua peluang tidak boleh membuka
+    // peluang yang balasannya kebetulan datang belakangan.
+    let permintaanBuka = 0;
     function bukaPeluang(id, opsiBuka) {
         const o = opsiBuka || {};
         if (!id) return;
+        const nomor = ++permintaanBuka;
         getJSON(asal + "/api/peluang/" + encodeURIComponent(id), function (hasil) {
+            if (nomor !== permintaanBuka) return;
             if (!sehat(hasil, elPesan)) return;
             s.aktif = hasil.data.data;
             gambarDetail(o.pesanSah);

@@ -138,9 +138,21 @@ try {
         await page.click('header .segmen button[data-nilai="id"]');
         await page.waitForLoadState("networkidle");
 
+        // Keputusan karyawan di K-04 harus terlihat di K-05, beserta versi
+        // kondisi batas yang dipakai saat rekomendasi itu dibuat (§7.2).
+        let statusBaru = null;
+        const tombolAksi = page.locator("#wadahAksi button");
+        if (await tombolAksi.count()) {
+            await tombolAksi.first().click();
+            await page.waitForTimeout(1000);
+            statusBaru = (await page.locator("#lencanaStatus").textContent()).trim();
+        }
         await page.goto(FE + "/riwayat/", { waitUntil: "networkidle" });
         await page.waitForTimeout(500);
-        p.lapor("K-05: riwayat memuat match yang baru dilihat", (await page.locator(`#wadahTabel a[href="/penjelasan/?id=${encodeURIComponent(matchKaryawan.id)}"]`).count()) === 1);
+        const barisRiwayat = page.locator("#wadahTabel tbody tr").filter({ has: page.locator(`a[href="/penjelasan/?id=${encodeURIComponent(matchKaryawan.id)}"]`) });
+        const isiBaris = (await barisRiwayat.count()) === 1 ? await barisRiwayat.textContent() : "";
+        p.lapor("K-05: riwayat memuat match yang baru diputuskan, dengan status barunya", (await barisRiwayat.count()) === 1 && (statusBaru === null || isiBaris.includes(statusBaru)), statusBaru || "(tanpa aksi tersedia)");
+        p.lapor("K-05: baris membawa versi kondisi batas yang dipakai", /v\d+/.test(isiBaris), isiBaris.slice(0, 120));
         pita = pita && await bersih(page);
         p.lapor("alur karyawan: tidak ada catatan internal di setiap layar", pita);
         tanpaGalat("alur karyawan", galat);
@@ -173,6 +185,7 @@ try {
         p.lapor("H-01: siklus dibuat dan dijalankan dari layar; pipeline memuat kandidat dengan batang", (await page.locator('#isiPipeline [data-uji="batang-kontribusi"]').count()) > 0);
         await page.locator('#isiPipeline a[href^="/detail-kandidat/"]').first().click();
         await page.waitForURL("**/detail-kandidat/**");
+        const matchH02 = new URL(page.url()).searchParams.get("id");
         const h02 = await bacaPenjelasan(page);
         p.lapor("H-02: batang kontribusi dan kalimat menampilkan angka yang sama", batangSamaKalimat(h02));
         await page.fill("#catatan", "Ditinjau dalam uji alur");
@@ -197,11 +210,24 @@ try {
         pita = pita && await bersih(page);
 
         await klikNav(page, "/aturan/");
+        const versiSebelum = Math.max(0, ...(((await apiJSON(hr.token, "/api/aturan?limit=200")).data) || []).map((a) => a.versi || 0));
         await page.click("#tombolLatihMitigasi");
         await page.waitForTimeout(800);
         await jalankanPekerjaAI();
-        await page.waitForSelector('[data-uji="kolom-perbandingan"][data-jenis="mitigasi"] [data-uji="plot-fairness"]', { timeout: 40000 }).catch(() => {});
-        p.lapor("H-05: latih dengan mitigasi → plot perbandingan kolom mitigasi terisi", (await page.locator('[data-uji="kolom-perbandingan"][data-jenis="mitigasi"] [data-uji="plot-fairness"]').count()) === 1);
+        // Data contoh sudah memuat satu versi bermitigasi, jadi kolom mitigasi
+        // sudah berplot sebelum pelatihan ini selesai. Yang ditunggu adalah
+        // keterangan versi yang BARU, bukan sekadar munculnya plot.
+        let aturanBaru = {};
+        for (let i = 0; i < 40 && !aturanBaru.versi; i++) {
+            aturanBaru = (((await apiJSON(hr.token, "/api/aturan?limit=200")).data) || []).find((a) => (a.versi || 0) > versiSebelum) || {};
+            if (!aturanBaru.versi) await page.waitForTimeout(1000);
+        }
+        const ketBaru = id["aturan.bandingkan_ket_versi"].replace("{versi}", String(aturanBaru.versi));
+        const kolomMitigasi = page.locator('[data-uji="kolom-perbandingan"][data-jenis="mitigasi"]');
+        await kolomMitigasi.filter({ hasText: ketBaru }).locator('[data-uji="plot-fairness"]').waitFor({ timeout: 60000 }).catch(() => {});
+        p.lapor("H-05: kolom mitigasi memakai versi hasil belajar yang BARU dilatih",
+            (await kolomMitigasi.locator('[data-uji="plot-fairness"]').count()) === 1 && !!aturanBaru.mitigasi_aktif && (await kolomMitigasi.textContent()).includes(ketBaru),
+            `versi sebelum=${versiSebelum} baru=${aturanBaru.versi} mitigasi=${aturanBaru.mitigasi_aktif}`);
         // Detail versi baru dibuka halaman sendiri setelah tugasnya selesai.
         await page.waitForSelector('[data-uji="aktifkan-aturan"]', { timeout: 40000 }).catch(() => {});
         const urut = await page.evaluate(() => {
@@ -221,11 +247,15 @@ try {
         pita = pita && await bersih(page);
 
         await klikNav(page, "/kondisi-batas/");
-        p.lapor("H-07: versi kondisi batas aktif tampil", (await page.locator("main").textContent()).includes("D4"));
+        const kondisiAktif = ((await apiJSON(hr.token, "/api/kondisi-batas?limit=200")).data || []).find((k) => k.aktif) || { pernyataan: [] };
+        const teksKondisi = (kondisiAktif.pernyataan[0] || {}).teks || "";
+        p.lapor("H-07: pernyataan versi aktif tampil apa adanya", teksKondisi.length > 0 && (await page.locator("main").textContent()).includes(teksKondisi), teksKondisi.slice(0, 60));
         pita = pita && await bersih(page);
 
         await klikNav(page, "/log-audit/");
-        p.lapor("A-03: menjalankan siklus dan keputusan match tercatat di log audit", (await page.locator("main tbody").textContent()).includes(id["logAudit.aksi.siklus_jalankan"]) && (await page.locator("main tbody").textContent()).includes(id["logAudit.aksi.match_status_ubah"]));
+        const siklusAlur = (((await apiJSON(hr.token, "/api/siklus?limit=200")).data) || []).find((s) => s.nama === namaSiklus) || {};
+        const isiLog = await page.locator("main tbody").textContent();
+        p.lapor("A-03: siklus DAN match yang baru diubah tercatat, dengan id objeknya", isiLog.includes(siklusAlur.id || "?") && isiLog.includes(matchH02) && isiLog.includes(id["logAudit.aksi.siklus_jalankan"]) && isiLog.includes(id["logAudit.aksi.match_status_ubah"]), `siklus=${siklusAlur.id} match=${matchH02}`)
         pita = pita && await bersih(page);
         p.lapor("alur HR: tidak ada catatan internal di setiap layar", pita);
         tanpaGalat("alur HR", galat);

@@ -49,7 +49,7 @@
 </main>
 
 <script type="module">
-import { getJSON } from "/assets/js/jscroot/api.js";
+import { getJSON } from "/assets/js/minta.js";
 import { getQueryString } from "/assets/js/jscroot/url.js";
 import { requireLogin, requireRole, tokenHeader } from "/assets/js/auth.js";
 import { sehat, el, kosongkan, sembunyikan } from "/assets/js/ui.js";
@@ -95,8 +95,10 @@ if (requireLogin() && requireRole("A-01")) {
         elKetSiklus.appendChild(keteranganSiklus(siklus || { id: id }));
         const nomor = ++permintaan;
         getJSON(urlAudit(id, selDimensi.value, selMetrik.value), function (hasil) {
-            if (!sehat(hasil, elPesan)) return;
+            // Basi diperiksa SEBELUM sehat(): galat dari pilihan lama tidak
+            // boleh menimpa pesan atau data pilihan yang sedang tampil.
             if (nomor !== permintaan) return;
+            if (!sehat(hasil, elPesan)) return;
             renderAudit(wadahAudit, hasil.data.data || {});
         }, ...tokenHeader());
     }

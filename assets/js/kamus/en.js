@@ -210,10 +210,10 @@ export default {
     "riwayat.kolom_siklus": "Cycle",
     "riwayat.kolom_peluang": "Opportunity",
     "riwayat.kolom_status": "Status",
+    "riwayat.kolom_kondisi": "Boundary conditions",
 
     "penjelasan.kondisi_judul": "Boundary conditions in force",
     "penjelasan.kondisi_versi": "Boundary conditions version {versi}",
-    "penjelasan.kondisi_beda_versi": "This recommendation was made under an older version of the boundary conditions; the currently active version ({versi}) is shown.",
     "pengguna.judul_halaman": "Users — Internal Talent Marketplace",
     "pengguna.daftar": "Accounts",
     "pengguna.cari": "Search username or name",

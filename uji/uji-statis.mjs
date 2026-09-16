@@ -70,6 +70,8 @@ let totalCb = 0;
 const semuaMasalahCb = [], semuaSink = [];
 for (const f of berkas(AKAR)) {
     const rel = path.relative(AKAR, f);
+    // minta.js MENDEFINISIKAN getJSON/postJSON, bukan memanggilnya.
+    if (rel === path.join("assets", "js", "minta.js")) continue;
     const teks = tanpaKomentar(readFileSync(f, "utf8"));
     const sink = [...teks.matchAll(SINK)].map((x) => x[0]);
     if (sink.length) semuaSink.push(`${rel}: ${[...new Set(sink)].join(", ")}`);

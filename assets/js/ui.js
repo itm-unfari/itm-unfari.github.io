@@ -116,5 +116,11 @@ export function sehat(hasil, elPesan) {
         pesan(elPesan, teksGalat(hasil), "galat");
         return false;
     }
+    // Badan yang bukan JSON (mis. halaman galat proksi) tidak boleh lolos:
+    // pemanggil membaca hasil.data.data tepat setelah baris ini.
+    if (!hasil.data || typeof hasil.data !== "object") {
+        pesan(elPesan, t("galat.jawaban_tak_dikenal"), "galat");
+        return false;
+    }
     return true;
 }

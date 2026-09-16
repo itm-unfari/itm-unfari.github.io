@@ -1,7 +1,7 @@
 // Perakit tampilan audit fairness (A-01, H-04, dan perbandingan aturan H-05).
 // Hanya agregat: modul ini tidak pernah menerima maupun menampilkan data
 // perorangan. Nama kelompok berasal dari data → textContent saja.
-import { getJSON } from "./jscroot/api.js";
+import { getJSON } from "./minta.js";
 import { asal } from "./config.js";
 import { tokenHeader } from "./auth.js";
 import { el, kosongkan, lencana, tabel, baris, kosong, sehat } from "./ui.js";

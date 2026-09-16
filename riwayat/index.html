@@ -21,7 +21,7 @@
 </main>
 
 <script type="module">
-import { getJSON } from "/assets/js/jscroot/api.js";
+import { getJSON } from "/assets/js/minta.js";
 import { asal } from "/assets/js/config.js";
 import { requireLogin, requireRole, tokenHeader } from "/assets/js/auth.js";
 import { sehat, el, kosongkan, lencana, tabel, baris, kosong } from "/assets/js/ui.js";
@@ -46,10 +46,10 @@ if (requireLogin() && requireRole("K-05")) {
         kosongkan(wadahTabel);
         const { wadah, tbody } = tabel([
             t("riwayat.kolom_siklus"), t("riwayat.kolom_peluang"), t("rekomendasi.kolom_skor"),
-            t("riwayat.kolom_status"), t("umum.tanggal"), "",
+            t("riwayat.kolom_status"), t("riwayat.kolom_kondisi"), t("umum.tanggal"), "",
         ]);
         if (!daftar.length) {
-            tbody.appendChild(kosong(6, t("umum.tidak_ada_data")));
+            tbody.appendChild(kosong(7, t("umum.tidak_ada_data")));
         } else {
             daftar.forEach(function (m) {
                 const a = el("a", "text-utama hover:underline text-sm", t("rekomendasi.lihat_penjelasan"));
@@ -58,6 +58,7 @@ if (requireLogin() && requireRole("K-05")) {
                 tbody.appendChild(baris([
                     m.siklus.nama, m.peluang.judul, Math.round(m.skor * 10) / 10,
                     lencana(t("status.match." + m.status), jenisMatch(m.status)),
+                    el("span", "font-data text-tinta-redup", m.kondisi_batas_versi ? "v" + m.kondisi_batas_versi : "—"),
                     isNaN(tgl) ? "" : tgl.toLocaleDateString(bahasa() === "en" ? "en-GB" : "id-ID"),
                     a,
                 ]));

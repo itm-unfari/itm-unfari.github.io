@@ -40,7 +40,7 @@
 </main>
 
 <script type="module">
-import { getJSON, postJSON } from "/assets/js/jscroot/api.js";
+import { getJSON, postJSON } from "/assets/js/minta.js";
 import { asal } from "/assets/js/config.js";
 import { requireLogin, requireRole, tokenHeader } from "/assets/js/auth.js";
 import { sembunyikan, sehat, el, kosongkan, lencana } from "/assets/js/ui.js";
@@ -64,7 +64,10 @@ if (requireLogin() && requireRole("K-02")) {
     // Teks sumber tidak pernah dikembalikan server (TugasAI.TeksSumber
     // json:"-"), jadi sorotan pada teks asli hanya mungkin untuk teks yang
     // dikirim dari halaman ini: disimpan per usulan selama halaman terbuka.
-    let tugasTerakhir = null;   // {id, teks}
+    // Satu kiriman = satu objek {id, teks, hasilId}. Dua kiriman beruntun
+    // tidak boleh saling menimpa: teks sumber untuk sorotan diambil dari
+    // kiriman yang menghasilkan usulan itu, bukan dari kiriman terakhir.
+    let kirimanTerakhir = null;
     const teksPerUsulan = {};
 
     function namaSkill(kode) {
@@ -151,7 +154,7 @@ if (requireLogin() && requireRole("K-02")) {
             if (!sehat(hasil, elPesan)) return;
             const daftar = hasil.data.data || [];
             kosongkan(elHasilBaru);
-            const idBaru = tugasTerakhir && tugasTerakhir.hasilId;
+            const idBaru = kirimanTerakhir && kirimanTerakhir.hasilId;
             const baru = idBaru ? daftar.find(function (u) { return u.id === idBaru; }) : null;
             if (baru) {
                 elHasilBaru.appendChild(el("h3", "font-medium", t("usulanSkill.hasil_baru")));
@@ -167,25 +170,32 @@ if (requireLogin() && requireRole("K-02")) {
         }, ...tokenHeader());
     }
 
-    function tungguTugas(tugasId, sisa) {
-        getJSON(asal + "/api/tugas-ai/" + encodeURIComponent(tugasId), function (hasil) {
+    function tungguTugas(kiriman, sisa) {
+        getJSON(asal + "/api/tugas-ai/" + encodeURIComponent(kiriman.id), function (hasil) {
             if (!sehat(hasil, elPesan)) return;
             const tugas = hasil.data.data;
+            const terbaru = kiriman === kirimanTerakhir;
             if (tugas.status === "selesai") {
-                elStatus.hidden = true;
-                tugasTerakhir.hasilId = tugas.hasil_id;
-                teksPerUsulan[tugas.hasil_id] = tugasTerakhir.teks;
+                if (terbaru) elStatus.hidden = true;
+                kiriman.hasilId = tugas.hasil_id;
+                teksPerUsulan[tugas.hasil_id] = kiriman.teks;
                 muatUsulan();
             } else if (tugas.status === "gagal") {
-                elStatus.textContent = t("usulanSkill.gagal");
-                elStatus.hidden = false;
+                if (terbaru) {
+                    elStatus.textContent = t("usulanSkill.gagal");
+                    elStatus.hidden = false;
+                }
             } else if (sisa <= 0) {
-                elStatus.textContent = t("usulanSkill.masih_diproses");
-                elStatus.hidden = false;
+                if (terbaru) {
+                    elStatus.textContent = t("usulanSkill.masih_diproses");
+                    elStatus.hidden = false;
+                }
             } else {
-                elStatus.textContent = t("usulanSkill.diproses");
-                elStatus.hidden = false;
-                setTimeout(function () { tungguTugas(tugasId, sisa - 1); }, 1500);
+                if (terbaru) {
+                    elStatus.textContent = t("usulanSkill.diproses");
+                    elStatus.hidden = false;
+                }
+                setTimeout(function () { tungguTugas(kiriman, sisa - 1); }, 1500);
             }
         }, ...tokenHeader());
     }
@@ -200,8 +210,8 @@ if (requireLogin() && requireRole("K-02")) {
         postJSON(asal + "/api/saya/usulan-skill", { teks: teks, bahasa: elBahasa.value }, function (hasil) {
             tombolKirim.disabled = false;
             if (!sehat(hasil, elPesan)) return;
-            tugasTerakhir = { id: hasil.data.data.id, teks: teks, hasilId: null };
-            tungguTugas(tugasTerakhir.id, 20);
+            kirimanTerakhir = { id: hasil.data.data.id, teks: teks, hasilId: null };
+            tungguTugas(kirimanTerakhir, 20);
         }, ...tokenHeader());
     });
 

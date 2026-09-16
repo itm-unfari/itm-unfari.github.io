@@ -30,7 +30,7 @@
     <div id="wadahTema"></div>
   </section>
 
-  <section class="kartu p-6">
+  <section id="bagianSandi" class="kartu p-6">
     <h2 class="eyebrow text-tinta-redup mb-4" data-i18n="akun.ganti_sandi">Ganti sandi</h2>
     <div id="pesanSandi" hidden role="alert"></div>
     <form id="formSandi" class="space-y-4 max-w-sm" novalidate>
@@ -52,9 +52,10 @@
 </main>
 
 <script type="module">
-import { getJSON, postJSON } from "/assets/js/jscroot/api.js";
+import { getJSON, postJSON } from "/assets/js/minta.js";
 import { backend } from "/assets/js/config.js";
-import { requireLogin, tokenHeader } from "/assets/js/auth.js";
+import { requireLogin, tokenHeader, getUser } from "/assets/js/auth.js";
+import { PERAN } from "/assets/js/config.js";
 import { pesan, sembunyikan, sehat } from "/assets/js/ui.js";
 import { t } from "/assets/js/i18n.js";
 import { pasang, sakelarTema } from "/assets/js/nav.js";
@@ -71,10 +72,15 @@ if (requireLogin()) {
         document.getElementById("peran").textContent = t("peran." + u.role);
     }, ...tokenHeader());
 
+    // Peran pakar tidak bisa menulis apa pun (§6 rencana); backend menolak
+    // /auth/password untuknya, jadi formulirnya tidak ditampilkan.
+    const pakar = getUser().role === PERAN.PAKAR;
+    document.getElementById("bagianSandi").hidden = pakar;
+
     const form = document.getElementById("formSandi");
     const tombol = document.getElementById("tombolSandi");
     const elSandi = document.getElementById("pesanSandi");
-    form.addEventListener("submit", function (e) {
+    if (!pakar) form.addEventListener("submit", function (e) {
         e.preventDefault();
         sembunyikan(elSandi);
         const lama = document.getElementById("lama").value;

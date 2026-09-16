@@ -68,15 +68,22 @@ Karena itu:
 3. Pustaka pihak ketiga di-*vendor*, tidak dari CDN. jscroot ada di
    `assets/js/jscroot/` apa adanya (lihat `VERSI.md` di dalamnya). Satu-satunya
    sumber luar adalah Google Fonts untuk huruf.
-4. **Setiap callback jscroot dimulai dengan `sehat(hasil, elPesan)`** dari
-   `ui.js`. jscroot tidak menangani 401 maupun galat jaringan sendiri; tanpa
-   ini sesi yang habis tampak sebagai halaman kosong tanpa sebab.
-5. Kelas Tailwind yang dirakit dinamis di JS harus di-*safelist* di
+4. **Permintaan API lewat `assets/js/minta.js`, bukan `jscroot/api.js`.** Di
+   jscroot, galat jaringan hanya masuk `console.log` dan badan yang bukan JSON
+   melempar di dalam `.then`, sehingga callback tidak pernah dipanggil: tombol
+   yang dikunci sebelum permintaan tetap terkunci selamanya. `minta.js`
+   memanggil callback tepat sekali, dengan `status` null bila tidak ada jawaban
+   dan `data` null bila badan kosong atau bukan JSON.
+5. **Setiap callback dimulai dengan `sehat(hasil, elPesan)`** dari `ui.js`.
+   `sehat()` menangani 401, kode galat, jawaban yang tidak berbentuk objek, dan
+   ketiadaan jawaban; tanpa ini sesi yang habis tampak sebagai halaman kosong
+   tanpa sebab.
+6. Kelas Tailwind yang dirakit dinamis di JS harus di-*safelist* di
    `tailwind.config.js`, atau warnanya hilang dari `app.css`.
-6. Teks antarmuka lewat kamus: `data-i18n` di HTML atau `t()` di JS, dengan
+7. Teks antarmuka lewat kamus: `data-i18n` di HTML atau `t()` di JS, dengan
    kunci yang **identik** di `assets/js/kamus/id.js` dan `en.js`. Galat API
    diterjemahkan lewat `code`, bukan `message`.
-7. Identifier, komentar, dan teks dalam bahasa Indonesia. Komentar hanya bila
+8. Identifier, komentar, dan teks dalam bahasa Indonesia. Komentar hanya bila
    alasannya tidak terlihat dari kode.
 
 Penjaga halaman di `auth.js` adalah kenyamanan, bukan keamanan — yang
@@ -98,8 +105,9 @@ menegakkan izin adalah backend.
 | `assets/js/layar.js` | Definisi kode layar: satu sumber untuk nav, mode pakar, P-02, dan tangkapan wireframe |
 | `assets/js/auth.js` | Sesi localStorage, penjaga halaman, `tokenHeader()`, `tujuanSetelahMasuk()` |
 | `assets/js/ui.js` | `el()`, `pesan()`, `sehat()`, `teksGalat()` |
+| `assets/js/minta.js` | `getJSON()`, `postJSON()`, `deleteJSON()`: callback selalu dipanggil tepat sekali, juga saat jaringan gagal |
 | `assets/js/nav.js` | Kerangka halaman: pita atas, kepala, nav per peran, sakelar bahasa dan tema |
-| `assets/js/jscroot/` | jscroot v0.2.8 di-*vendor*. Jangan disunting |
+| `assets/js/jscroot/` | jscroot v0.2.8 di-*vendor*. Jangan disunting. Hanya `url.js` dan `element.js` yang dipakai; `api.js` digantikan `minta.js` |
 | `uji/` | Playwright: `serve.sh`, `package.json`, berkas uji; `tangkapan/` untuk hasil tangkapan layar |
 | `.githooks/` | Hook identitas commit, dipasang lewat `.githooks/pasang.sh` |
 | `.github/workflows/pages.yml` | Deploy Pages, hanya `workflow_dispatch` |

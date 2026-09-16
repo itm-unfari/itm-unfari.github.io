@@ -9,9 +9,16 @@ export const tokenKey = "login";
 // cabang produksi dan diam-diam memanggil backend produksi.
 const HOST_PENGEMBANGAN = new Set(["localhost", "127.0.0.1", "100.125.6.77"]);
 
-// Domain produksi → alamat backend. Diisi saat keputusan GCP dan domain
-// (Tahap 7). Host yang tidak disebut di sini tidak mendapat backend sama sekali.
-const PRODUKSI = {};
+// Domain produksi → alamat backend. Host yang tidak disebut di sini tidak
+// mendapat backend sama sekali, jadi salinan situs di domain lain tidak bisa
+// diam-diam memanggil backend ini.
+//
+// Alamat cloudfunctions.net dipakai, bukan URL run.app, karena bentuknya
+// ditentukan nama fungsi dan region: fungsi yang dibangun ulang tetap beralamat
+// sama, sedangkan URL run.app membawa hash yang bisa berubah.
+const PRODUKSI = {
+    "itm-unfari.github.io": "https://asia-southeast2-itm-unfari.cloudfunctions.net/itm-gocroot",
+};
 
 const host = window.location.hostname;
 export const asal = HOST_PENGEMBANGAN.has(host)

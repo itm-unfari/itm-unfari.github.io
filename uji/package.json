@@ -13,6 +13,7 @@
         "mutu:negatif": "node uji-mutu.mjs --harap-gagal",
         "mutu:langsung": "node uji-mutu.mjs --langsung",
         "demo": "node siapkan-demo.mjs",
+        "publik": "node uji-publik.mjs",
         "tangkap": "node tangkap-layar.mjs --langsung",
         "tangkap:pakar": "PERAN=6 node tangkap-layar.mjs --langsung",
         "semua": "node uji-kamus.mjs && node uji-statis.mjs && node uji-tiruan.mjs && node uji-langsung.mjs && node uji-alur.mjs && node uji-mutu.mjs && node uji-mutu.mjs --harap-gagal && node uji-mutu.mjs --langsung"
